@@ -1,6 +1,4 @@
 
-# DFS algorithm:
-
 def depth_first_search(nodes, edges, origin, destinations):
     nodes_created = 1
     root = Node(origin, None, 0, 0)
@@ -20,12 +18,11 @@ def depth_first_search(nodes, edges, origin, destinations):
 
         if current.state in destinations:
             return current, nodes_created
-        
-        for next_state, _ in edges.get(current.state, []): # we arent worried about costs for DFS "_"
+
+        for next_state, edge_cost in sorted(edges.get(current.state, []), key=lambda item: item[0], reverse=True):
             if next_state not in visited:
                 child = Node(next_state, current, 0, current.depth + 1, nodes_created)
                 nodes_created += 1
-
                 frontier.append(child)
 
     return None, nodes_created, []
