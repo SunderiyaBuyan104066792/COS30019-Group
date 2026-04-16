@@ -56,7 +56,9 @@ def parse_file(filename):
             elif section == "destinations":
                 parts = content.split(";")
                 for part in parts:
-                    destinations.add(int(part.strip()))
+                    part = part.strip()
+                    if part != "":
+                        destinations.add(int(part))
 
     for from_node in edges:
         edges[from_node] = sorted(edges[from_node], key=lambda item: item[0])
@@ -105,6 +107,68 @@ def hn(state, nodes, destinations):
     return best_distance
 
 
+def breadth_first_search(edges, origin, destinations):
+    nodes_created = 1
+    root = Node(origin)
+
+    if root.state in destinations:
+        return root, nodes_created
+
+    frontier = deque([root])
+    visited = {origin}
+
+    while frontier:
+        current = frontier.popleft()
+
+        if current.state in destinations:
+            return current, nodes_created
+
+        neighbours = edges.get(current.state, [])
+
+        for next_state, _ in neighbours:
+            if next_state not in visited:
+                child = Node(next_state, current, 0, current.depth + 1, nodes_created)
+                nodes_created += 1
+
+                if next_state in destinations:
+                    return child, nodes_created
+
+                visited.add(next_state)
+                frontier.append(child)
+
+    return None, nodes_created
+
+def depth_first_search(edges, origin, destinations):
+    nodes_created = 1
+    root = Node(origin, None, 0, 0, 0)
+
+    if root.state in destinations:
+        return root, nodes_created
+
+    frontier = [root]
+    visited = set()
+
+    while frontier:
+        current = frontier.pop()
+
+        if current.state in visited:
+            continue
+        visited.add(current.state)
+
+        if current.state in destinations:
+            return current, nodes_created
+
+        neighbours = edges.get(current.state, [])
+        
+        for next_state, _ in reversed(neighbours):
+            if next_state not in visited:
+                child = Node(next_state, current, 0, current.depth + 1, nodes_created)
+                nodes_created += 1
+
+                frontier.append(child)
+
+    return None, nodes_created
+
 def greedy_best_first_search(nodes, edges, origin, destinations):
     nodes_created = 1
     root = Node(origin, None, 0, 0, 0)
@@ -113,30 +177,87 @@ def greedy_best_first_search(nodes, edges, origin, destinations):
         return root, nodes_created
 
     frontier = []
+    visited = set()
+
     root_h = hn(origin, nodes, destinations)
     heapq.heappush(frontier, (root_h, origin, root.created_order, root))
 
     while frontier:
         current = heapq.heappop(frontier)[3]
 
+        if current.state in visited:
+            continue
+        visited.add(current.state)
+
         if current.state in destinations:
             return current, nodes_created
 
-        for next_state, edge_cost in edges.get(current.state, []):
-            child = Node(
-                next_state,
-                current,
-                current.path_cost + edge_cost,
-                current.depth + 1,
-                nodes_created
-            )
-            nodes_created += 1
+        neighbours = edges.get(current.state, [])
 
-            h = hn(next_state, nodes, destinations)
-            heapq.heappush(frontier, (h, next_state, child.created_order, child))
+        for next_state, edge_cost in neighbours:
+            if next_state not in visited:
+                child = Node(
+                    next_state,
+                    current,
+                    current.path_cost + edge_cost,
+                    current.depth + 1,
+                    nodes_created
+                )
+                nodes_created += 1
+
+                h = hn(next_state, nodes, destinations)
+                heapq.heappush(frontier, (h, next_state, child.created_order, child))
 
     return None, nodes_created
 
+def astar_search(nodes, edges, origin, destinations):
+    nodes_created = 1
+    counter = 0
+
+    root = Node(origin, None, 0, 0, counter)
+
+    if root.state in destinations:
+        return root, nodes_created
+
+    root_h = hn(origin, nodes, destinations)
+
+    # (f_cost, node_id, insertion_counter, node)
+    frontier = [(root.path_cost + root_h, root.state, counter, root)]
+    best_g = {origin: 0}
+
+    while frontier:
+        _, _, _, current = heapq.heappop(frontier)
+
+        if current.path_cost > best_g.get(current.state, float("inf")):
+            continue
+
+        if current.state in destinations:
+            return current, nodes_created
+        
+        neighbours = edges.get(current.state, [])
+
+        for next_state, edge_cost in neighbours:
+            new_g = current.path_cost + edge_cost
+
+            if new_g < best_g.get(next_state, float("inf")):
+                best_g[next_state] = new_g
+                counter += 1
+
+                child = Node(
+                    next_state,
+                    current,
+                    new_g,
+                    current.depth + 1,
+                    counter
+                )
+                nodes_created += 1
+
+                h = hn(next_state, nodes, destinations)
+                f = new_g + h
+
+                heapq.heappush(frontier, (f, next_state, child.created_order, child))
+
+    return None, nodes_created
 
 def print_result(filename, method, result_node, nodes_created):
     print(filename, method)
@@ -161,17 +282,16 @@ def main():
 
     nodes, edges, origin, destinations = parse_file(filename)
 
-    #DELETE BEFORE SUBMISSION - See how i formatted it
-    print(nodes)
-    print(edges)
-    print(origin)
-    print(destinations)
-
-    if method == "GBFS":
+    if method == "BFS":
+        result_node, nodes_created = breadth_first_search(edges, origin, destinations)
+    elif method == "DFS":
+        result_node, nodes_created = depth_first_search(edges, origin, destinations)
+    elif method == "GBFS":
         result_node, nodes_created = greedy_best_first_search(nodes, edges, origin, destinations)
-    #ADD yours here
+    elif  method == "AS":
+        result_node, nodes_created = astar_search(nodes, edges, origin, destinations)
     else:
-        print("Please choose from BFS, DFS, GBFS, A*, CUS1, CUS2")
+        print("Please choose from BFS, DFS, GBFS, AS, CUS1, CUS2")
         return
 
     print_result(filename, method, result_node, nodes_created)
