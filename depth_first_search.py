@@ -3,10 +3,10 @@
 
 def depth_first_search(nodes, edges, origin, destinations):
     nodes_created = 1
-    root = Node(origin, None, 0, 0, 0)
+    root = Node(origin, None, 0, 0)
 
     if root.state in destinations:
-        return root, nodes_created
+        return root, nodes_created, [root.state]
 
     frontier = [root]
     visited = set()
@@ -21,15 +21,14 @@ def depth_first_search(nodes, edges, origin, destinations):
         if current.state in destinations:
             return current, nodes_created
         
-        neighbours = sorted(edges.get(current.state), [], key=lambda x: x[0], reverse= True)
-        for next_state, _ in neighbours: # we arent worried about costs for DFS "_"
+        for next_state, _ in edges.get(current.state, []): # we arent worried about costs for DFS "_"
             if next_state not in visited:
                 child = Node(next_state, current, 0, current.depth + 1, nodes_created)
                 nodes_created += 1
 
                 frontier.append(child)
 
-    return None, nodes_created
+    return None, nodes_created, []
 
 # Number of Tests: 2
 
@@ -93,9 +92,8 @@ def dfs_tests():
 
 
 # for main:
-
-elif method == "DFS":
-    result_node, nodes_created = depth_first_search(nodes, edges, origin, destinations)
+# if method == "DFS":
+#     result_node, nodes_created, path = depth_first_search(nodes, edges, origin, destinations)
 
 
 dfs_tests()
