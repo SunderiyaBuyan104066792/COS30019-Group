@@ -309,18 +309,22 @@ def depth_limited_search(origin, destinations, edges, limit):
     return result, nodes_created
 
 
-def ALT_hn(state,destinations,Landmarks,LM_Table):    
+def ALT_hn(state, destinations, landmarks, LM_Table):
     goals = []
-    # to check for any of the valid destinations
+    # to check for any of the valid destinationsz
     for goal in destinations:
         best_distance = float("-inf")
-        for L in Landmarks:
+        for L in landmarks:
+            if state not in LM_Table[L] or goal not in LM_Table[L]:
+                continue
             dist = abs(LM_Table[L][state] - LM_Table[L][goal])
-            best_distance = max(best_distance,dist)
-        goals.append(best_distance)
-            
-        
-    #return best distance
+            best_distance = max(best_distance, dist)
+        if best_distance != float("-inf"):
+            goals.append(best_distance)
+
+    if not goals:
+        return 0
+
     return min(goals)
     
 def Landmark_table(landmarks, edges):
@@ -477,7 +481,7 @@ def main():
 
         limit = int(sys.argv[3])
         result_node, nodes_created = depth_limited_search(origin, destinations, edges, limit)
-    elif  method == "AL":
+    elif  method == "ALT":
         result_node, nodes_created = a_landmark_triangle_inequality_search(nodes, edges, origin, destinations)
     else:
         print("Please choose from BFS, DFS, GBFS, AS, DLS <limit>, ALT")
