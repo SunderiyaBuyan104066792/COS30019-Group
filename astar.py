@@ -120,18 +120,18 @@ def main():
     method = sys.argv[2].upper()
 
     if method != 'AS':
-        print(f"This script only supports AS. Got: '{method}'")
+        print(f"Unknown method '{method}'. Use AS.")
         sys.exit(1)
 
     nodes, edges, origin, destinations = parse_problem(filename)
     goal, nodes_created, path = astar(nodes, edges, origin, destinations)
 
-    print(f"{filename} {method}")
+    print(f"{method}")
     if goal is not None:
         print(f"{goal} {nodes_created}")
         print(' -> '.join(str(n) for n in path))
     else:
-        print(f"No goal is reachable; {nodes_created} nodes created.")
+        print(f"No goal is found.")
 
 
 if __name__ == '__main__':
