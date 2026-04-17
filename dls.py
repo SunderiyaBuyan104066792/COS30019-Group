@@ -111,7 +111,7 @@ def depth_limited_search(origin, destinations, edges, limit):
 
 def main():
     if len(sys.argv) != 3:
-        print("Usage: python search_cus1_dls.py <filename> <method>")
+        print("Usage: python dls.py <filename> <method>")
         sys.exit(1)
 
     filename = sys.argv[1]
