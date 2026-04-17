@@ -259,6 +259,53 @@ def astar_search(nodes, edges, origin, destinations):
 
     return None, nodes_created
 
+def depth_limited_search(origin, destinations, edges, limit):
+    CUTOFF = object()
+    nodes_created = 1
+    root = Node(origin, None, 0, 0, 0)
+
+    def recursive_dls(current, visited, depth):
+        nonlocal nodes_created
+
+        if current.state in destinations:
+            return current
+
+        if depth == 0:
+            return CUTOFF
+
+        neighbours = edges.get(current.state, [])
+        
+        cutoff_occurred = False
+
+        for next_state, _ in neighbours:
+            if next_state in visited:
+                continue
+
+            child = Node(next_state, current, 0, current.depth + 1, nodes_created)
+            nodes_created += 1
+
+            visited.add(next_state)
+            result = recursive_dls(child, visited, depth - 1)
+
+            if result is CUTOFF:
+                cutoff_occurred = True
+            elif result is not None:
+                return result
+
+            visited.remove(next_state)
+
+        if cutoff_occurred:
+            return CUTOFF
+
+        return None
+
+    result = recursive_dls(root, {origin}, limit)
+
+    if result is CUTOFF or result is None:
+        return None, nodes_created
+
+    return result, nodes_created
+
 def print_result(filename, method, result_node, nodes_created):
     print(filename, method)
 
@@ -290,8 +337,10 @@ def main():
         result_node, nodes_created = greedy_best_first_search(nodes, edges, origin, destinations)
     elif  method == "AS":
         result_node, nodes_created = astar_search(nodes, edges, origin, destinations)
+    elif  method == "DLS":
+        result_node, nodes_created = depth_limited_search(origin, destinations, edges, limit=50)
     else:
-        print("Please choose from BFS, DFS, GBFS, AS, CUS1, CUS2")
+        print("Please choose from BFS, DFS, GBFS, AS, DLS, CUS2")
         return
 
     print_result(filename, method, result_node, nodes_created)
