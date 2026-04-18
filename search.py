@@ -34,6 +34,10 @@ def parse_file(filename):
                 section = "destinations"
                 continue
 
+            if content == "Landmarks":
+                section = "landmarks" 
+                continue
+
             if section == "nodes":
                 n_id, coords = content.split(":")
                 x, y = coords.strip().strip("()").split(",")
@@ -61,6 +65,13 @@ def parse_file(filename):
                     part = part.strip()
                     if part != "":
                         destinations.add(int(part))
+
+            elif section == "landmarks":
+                parts = content.split(";")
+                for part in parts:
+                    part = part.strip()
+                    if part != "":
+                        landmarks.add(int(part))
 
 # Sorts each neighbours by destination node ID 
     for from_node in edges:
