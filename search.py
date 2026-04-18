@@ -72,7 +72,7 @@ def parse_file(filename):
                 for part in parts:
                     part = part.strip()
                     if part != "":
-                        landmarks.add(int(part))
+                        landmarks.append(int(part))
 
 # Sorts each neighbours by destination node ID 
     for from_node in edges:
