@@ -2,6 +2,7 @@ import sys
 import math
 import heapq
 import random
+import time
 from collections import deque
 
 #Parses input file to extract and format nodes, edges, origin, and destinations. 
@@ -481,6 +482,7 @@ def print_result(filename, method, result_node, nodes_created):
 
 
 def main():
+    start = time.perf_counter()
     if len(sys.argv) < 3:
         print("Usage: python search.py <filename> <method> [limit]")
         sys.exit()
@@ -512,6 +514,8 @@ def main():
         return
 
     print_result(filename, method, result_node, nodes_created)
+    end = time.perf_counter()
+    print(f"Elapsed time: {end - start:.6f} seconds")
 
 
 if __name__ == "__main__":
