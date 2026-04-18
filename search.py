@@ -4,7 +4,7 @@ import heapq
 import random
 from collections import deque
 
-
+#Parses input file to extract and format nodes, edges, origin, and destinations. 
 def parse_file(filename):
     nodes = {}
     edges = {}
@@ -61,12 +61,13 @@ def parse_file(filename):
                     if part != "":
                         destinations.add(int(part))
 
+# Sorts each neighbours by destination node ID 
     for from_node in edges:
         edges[from_node] = sorted(edges[from_node], key=lambda item: item[0])
 
     return nodes, edges, origin, destinations
 
-
+#Search node in tree
 class Node:
     def __init__(self, state, parent=None, path_cost=0, depth=0, created_order=0):
         self.state = state
@@ -75,7 +76,7 @@ class Node:
         self.depth = depth
         self.created_order = created_order
 
-
+#Constructs path by tracing from goal to root. Returns path in correct order
 def build_path(goal_node):
     path = []
     current = goal_node
@@ -87,14 +88,14 @@ def build_path(goal_node):
     path.reverse()
     return path
 
-
+#Calculates the straight line distance between two (x, y) coordinate points
 def straight_line_distance(point_a, point_b):
     dx = point_b[0] - point_a[0]
     dy = point_b[1] - point_a[1]
     return math.sqrt(dx ** 2 + dy ** 2)
 
-
-def hn(state, nodes, destinations):
+#Computes the straight-line distance from a state to the nearest destination using the calculation
+def heuristic_distance(state, nodes, destinations):
     current_point = nodes[state]
     best_distance = float("inf")
 
@@ -107,7 +108,7 @@ def hn(state, nodes, destinations):
 
     return best_distance
 
-
+# Search algorithm: BFS
 def breadth_first_search(nodes,edges, origin, destinations):
     if not origin or not destinations or origin not in nodes:
         return None, 0
@@ -137,6 +138,7 @@ def breadth_first_search(nodes,edges, origin, destinations):
 
     return None, nodes_created
 
+# Search algorithm: DFS
 def depth_first_search(nodes, edges, origin, destinations):
     if not origin or not destinations or origin not in nodes:
         return None, 0
@@ -169,6 +171,8 @@ def depth_first_search(nodes, edges, origin, destinations):
 
     return None, nodes_created
 
+
+# Search algorithm: GBFS
 def greedy_best_first_search(nodes, edges, origin, destinations):
     if not origin or not destinations or origin not in nodes:
         return None, 0
@@ -183,7 +187,7 @@ def greedy_best_first_search(nodes, edges, origin, destinations):
     frontier = []
     visited = set()
 
-    root_h = hn(origin, nodes, destinations)
+    root_h = heuristic_distance(origin, nodes, destinations)
     heapq.heappush(frontier, (root_h, origin, root.created_order, root))
 
     while frontier:
@@ -209,11 +213,12 @@ def greedy_best_first_search(nodes, edges, origin, destinations):
                 )
                 nodes_created += 1
 
-                h = hn(next_state, nodes, destinations)
+                h = heuristic_distance(next_state, nodes, destinations)
                 heapq.heappush(frontier, (h, next_state, child.created_order, child))
 
     return None, nodes_created
 
+# Search algorithm: A Star
 def astar_search(nodes, edges, origin, destinations):
     if not origin or not destinations or origin not in nodes:
         return None, 0
@@ -223,7 +228,7 @@ def astar_search(nodes, edges, origin, destinations):
     root = Node(origin, None, 0, 0, nodes_created)
     nodes_created += 1
 
-    root_h = hn(origin, nodes, destinations)
+    root_h = heuristic_distance(origin, nodes, destinations)
 
     # (f_cost, node_id, insertion_counter, node)
     frontier = [(root.path_cost + root_h, root.state, counter, root)]
@@ -256,14 +261,15 @@ def astar_search(nodes, edges, origin, destinations):
                 )
                 nodes_created += 1
 
-                h = hn(next_state, nodes, destinations)
+                h = heuristic_distance(next_state, nodes, destinations)
                 f = new_g + h
 
                 heapq.heappush(frontier, (f, next_state, child.created_order, child))
 
     return None, nodes_created
 
-def depth_limited_search(origin, destinations, edges, nodes, limit):
+# Search algorithm: CUS1 DLS
+def depth_limited_search(nodes, edges, origin, destinations, limit):
     if not origin or not destinations or origin not in nodes:
         return None, 0
 
@@ -319,7 +325,10 @@ def depth_limited_search(origin, destinations, edges, nodes, limit):
     return result, nodes_created
 
 
-def ALT_hn(state, destinations, landmarks, LM_Table):
+# CUS 2: Helpers
+
+#Computes an admissible heuristic using the ALT (A*, Landmarks, Triangle inequality) method.
+def landmark_heuristic(state, destinations, landmarks, LM_Table):
     goals = []
     # to check for any of the valid destinationsz
     for goal in destinations:
@@ -336,17 +345,19 @@ def ALT_hn(state, destinations, landmarks, LM_Table):
         return 0
 
     return min(goals)
-    
-def Landmark_table(landmarks, edges):
+
+#Precomputes shortest distances from each landmark to all reachable nodes. 
+#Returns a dictionary mapping each landmark to its distance dictionary.
+def create_landmark_table(landmarks, edges):
     LM_Table = {}
 
     for L in landmarks:
         #value here is node to Landmark
-        LM_Table[L] = (Dijkstra_Calc(edges, L))
+        LM_Table[L] = (dijkstra_calc(edges, L))
     return LM_Table
 
-    
-def Dijkstra_Calc(edges, landmark):
+#Dijkstra's algorithm from a landmark node and return a dictionary of shortest distances
+def dijkstra_calc(edges, landmark):
     #same as A* but with h(n) = 0 and returns shortest distance instead of path to goal node
     nodes_created = 1
     counter = 0
@@ -387,7 +398,7 @@ def Dijkstra_Calc(edges, landmark):
                 heapq.heappush(frontier, (f, next_state, child.created_order, child))
     return landmark_dist
 
-
+#Search Algorithm: CUS2 ALT
 def a_landmark_triangle_inequality_search(nodes, edges, origin, destinations):
     if not origin or not destinations or origin not in nodes:
         return None, 0
@@ -407,8 +418,8 @@ def a_landmark_triangle_inequality_search(nodes, edges, origin, destinations):
         return root, nodes_created
     
     #creates a dictionary contain all distances for all nodes from all landmarks
-    landmark_table = Landmark_table(landmarks, edges)
-    root_h = ALT_hn(origin,destinations,landmarks,landmark_table)
+    landmark_table = create_landmark_table(landmarks, edges)
+    root_h = landmark_heuristic(origin,destinations,landmarks,landmark_table)
     
     # (f_cost, node_id, insertion_counter, node)
     frontier = [(root.path_cost + root_h, root.state, counter, root)]
@@ -441,7 +452,7 @@ def a_landmark_triangle_inequality_search(nodes, edges, origin, destinations):
                 nodes_created += 1
                 counter += 1
 
-                h = ALT_hn(next_state, destinations, landmarks, landmark_table)
+                h = landmark_heuristic(next_state, destinations, landmarks, landmark_table)
                 f = new_g + h
 
                 heapq.heappush(frontier, (f, next_state, child.created_order, child))
@@ -449,7 +460,7 @@ def a_landmark_triangle_inequality_search(nodes, edges, origin, destinations):
     return None, nodes_created
 
 
-
+#Prints the search result: goal reached, nodes created, and path.
 def print_result(filename, method, result_node, nodes_created):
     print(filename, method)
 
@@ -493,7 +504,7 @@ def main():
             sys.exit()
 
         limit = int(sys.argv[3])
-        result_node, nodes_created = depth_limited_search(nodes, origin, destinations, edges, limit)
+        result_node, nodes_created = depth_limited_search(nodes, edges, origin, destinations, limit)
     elif  method == "ALT":
         result_node, nodes_created = a_landmark_triangle_inequality_search(nodes, edges, origin, destinations)
     else:
