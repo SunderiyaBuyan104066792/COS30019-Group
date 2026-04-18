@@ -11,6 +11,7 @@ def parse_file(filename):
     edges = {}
     origin = None
     destinations = set()
+    landmarks = []
 
     section = ""
 
@@ -34,7 +35,7 @@ def parse_file(filename):
                 section = "destinations"
                 continue
 
-            if content == "Landmarks":
+            if content == "Landmarks:":
                 section = "landmarks" 
                 continue
 
@@ -77,7 +78,7 @@ def parse_file(filename):
     for from_node in edges:
         edges[from_node] = sorted(edges[from_node], key=lambda item: item[0])
 
-    return nodes, edges, origin, destinations
+    return nodes, edges, origin, destinations, landmarks
 
 #Search node in tree
 class Node:
@@ -411,20 +412,22 @@ def dijkstra_calc(edges, landmark):
     return landmark_dist
 
 #Search Algorithm: CUS2 ALT
-def a_landmark_triangle_inequality_search(nodes, edges, origin, destinations):
+def a_landmark_triangle_inequality_search(nodes, edges, origin, destinations, landmarks=None):
     if not origin or not destinations or origin not in nodes:
         return None, 0
+    
 
     nodes_created = 0
     counter = 0
 
     root = Node(origin, None, 0, 0, nodes_created)
     nodes_created += 1
-
-    #create random landmarks based on given nodes with a minimum of 2 landmarks and a max of 16
-    k = min(16, max(2, int(len(nodes) ** 0.5)))
-    k = min(k, len(nodes))
-    landmarks = random.sample(list(nodes.keys()), k)
+    
+    if not landmarks:
+        #create random landmarks based on given nodes with a minimum of 2 landmarks and a max of 16
+        k = min(16, max(2, int(len(nodes) ** 0.5)))
+        k = min(k, len(nodes))
+        landmarks = random.sample(list(nodes.keys()), k)
 
     if root.state in destinations:
         return root, nodes_created
@@ -501,7 +504,7 @@ def main():
     filename = sys.argv[1]
     method = sys.argv[2].upper()
 
-    nodes, edges, origin, destinations = parse_file(filename)
+    nodes, edges, origin, destinations, landmarks = parse_file(filename)
 
     if method == "BFS":
         result_node, nodes_created = breadth_first_search(nodes, edges, origin, destinations)
@@ -519,7 +522,7 @@ def main():
         limit = int(sys.argv[3])
         result_node, nodes_created = depth_limited_search(nodes, edges, origin, destinations, limit)
     elif  method == "ALT":
-        result_node, nodes_created = a_landmark_triangle_inequality_search(nodes, edges, origin, destinations)
+        result_node, nodes_created = a_landmark_triangle_inequality_search(nodes, edges, origin, destinations, landmarks)
     else:
         print("Please choose from BFS, DFS, GBFS, AS, DLS <limit>, ALT")
         return
