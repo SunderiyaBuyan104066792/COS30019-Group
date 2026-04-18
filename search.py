@@ -131,9 +131,6 @@ def breadth_first_search(edges, origin, destinations):
                 child = Node(next_state, current, 0, current.depth + 1, nodes_created)
                 nodes_created += 1
 
-                if next_state in destinations:
-                    return child, nodes_created
-
                 visited.add(next_state)
                 frontier.append(child)
 
