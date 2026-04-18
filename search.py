@@ -108,12 +108,13 @@ def hn(state, nodes, destinations):
     return best_distance
 
 
-def breadth_first_search(edges, origin, destinations):
-    nodes_created = 1
-    root = Node(origin)
+def breadth_first_search(nodes,edges, origin, destinations):
+    if not origin or not destinations or origin not in nodes:
+        return None, 0
 
-    if root.state in destinations:
-        return root, nodes_created
+    nodes_created = 0
+    root = Node(origin, None, 0, 0, nodes_created)
+    nodes_created += 1
 
     frontier = deque([root])
     visited = {origin}
@@ -136,12 +137,13 @@ def breadth_first_search(edges, origin, destinations):
 
     return None, nodes_created
 
-def depth_first_search(edges, origin, destinations):
-    nodes_created = 1
-    root = Node(origin, None, 0, 0, 0)
+def depth_first_search(nodes, edges, origin, destinations):
+    if not origin or not destinations or origin not in nodes:
+        return None, 0
 
-    if root.state in destinations:
-        return root, nodes_created
+    nodes_created = 0
+    root = Node(origin, None, 0, 0, nodes_created)
+    nodes_created += 1
 
     frontier = [root]
     visited = set()
@@ -168,8 +170,12 @@ def depth_first_search(edges, origin, destinations):
     return None, nodes_created
 
 def greedy_best_first_search(nodes, edges, origin, destinations):
-    nodes_created = 1
-    root = Node(origin, None, 0, 0, 0)
+    if not origin or not destinations or origin not in nodes:
+        return None, 0
+
+    nodes_created = 0
+    root = Node(origin, None, 0, 0, nodes_created)
+    nodes_created += 1
 
     if root.state in destinations:
         return root, nodes_created
@@ -209,13 +215,12 @@ def greedy_best_first_search(nodes, edges, origin, destinations):
     return None, nodes_created
 
 def astar_search(nodes, edges, origin, destinations):
-    nodes_created = 1
-    counter = 0
+    if not origin or not destinations or origin not in nodes:
+        return None, 0
 
-    root = Node(origin, None, 0, 0, counter)
-
-    if root.state in destinations:
-        return root, nodes_created
+    nodes_created = 0
+    root = Node(origin, None, 0, 0, nodes_created)
+    nodes_created += 1
 
     root_h = hn(origin, nodes, destinations)
 
@@ -257,10 +262,17 @@ def astar_search(nodes, edges, origin, destinations):
 
     return None, nodes_created
 
-def depth_limited_search(origin, destinations, edges, limit):
+def depth_limited_search(origin, destinations, edges, nodes, limit):
+    if not origin or not destinations or origin not in nodes:
+        return None, 0
+
     CUTOFF = object()
-    nodes_created = 1
-    root = Node(origin, None, 0, 0, 0)
+    nodes_created = 0
+    root = Node(origin, None, 0, 0, nodes_created)
+    nodes_created += 1
+
+    if root.state in destinations:
+        return root, nodes_created
 
     def recursive_dls(current, visited, depth):
         nonlocal nodes_created
@@ -376,11 +388,14 @@ def Dijkstra_Calc(edges, landmark):
 
 
 def a_landmark_triangle_inequality_search(nodes, edges, origin, destinations):
-    #same as A* but using different h(n)
-    nodes_created = 1
+    if not origin or not destinations or origin not in nodes:
+        return None, 0
+
+    nodes_created = 0
     counter = 0
 
-    root = Node(origin, None, 0, 0, counter)
+    root = Node(origin, None, 0, 0, nodes_created)
+    nodes_created += 1
 
     #create random landmarks based on given nodes with a minimum of 2 landmarks and a max of 16
     k = min(16, max(2, int(len(nodes) ** 0.5)))
@@ -414,18 +429,18 @@ def a_landmark_triangle_inequality_search(nodes, edges, origin, destinations):
 
             if new_g < best_g.get(next_state, float("inf")):
                 best_g[next_state] = new_g
-                counter += 1
 
                 child = Node(
                     next_state,
                     current,
                     new_g,
                     current.depth + 1,
-                    counter
+                    nodes_created
                 )
                 nodes_created += 1
- 
-                h = ALT_hn(next_state,destinations,landmarks,landmark_table)
+                counter += 1
+
+                h = ALT_hn(next_state, destinations, landmarks, landmark_table)
                 f = new_g + h
 
                 heapq.heappush(frontier, (f, next_state, child.created_order, child))
@@ -464,9 +479,9 @@ def main():
     nodes, edges, origin, destinations = parse_file(filename)
 
     if method == "BFS":
-        result_node, nodes_created = breadth_first_search(edges, origin, destinations)
+        result_node, nodes_created = breadth_first_search(nodes, edges, origin, destinations)
     elif method == "DFS":
-        result_node, nodes_created = depth_first_search(edges, origin, destinations)
+        result_node, nodes_created = depth_first_search(nodes,edges, origin, destinations)
     elif method == "GBFS":
         result_node, nodes_created = greedy_best_first_search(nodes, edges, origin, destinations)
     elif  method == "AS":
@@ -477,7 +492,7 @@ def main():
             sys.exit()
 
         limit = int(sys.argv[3])
-        result_node, nodes_created = depth_limited_search(origin, destinations, edges, limit)
+        result_node, nodes_created = depth_limited_search(nodes, origin, destinations, edges, limit)
     elif  method == "ALT":
         result_node, nodes_created = a_landmark_triangle_inequality_search(nodes, edges, origin, destinations)
     else:
