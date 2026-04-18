@@ -219,6 +219,7 @@ def astar_search(nodes, edges, origin, destinations):
         return None, 0
 
     nodes_created = 0
+    counter = 0
     root = Node(origin, None, 0, 0, nodes_created)
     nodes_created += 1
 
