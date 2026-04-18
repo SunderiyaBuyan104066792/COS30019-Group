@@ -1,107 +1,216 @@
 import sys
+import math
+import heapq
+import random
 from collections import deque
 
-from utils import *
 
+def parse_file(filename):
+    nodes = {}
+    edges = {}
+    origin = None
+    destinations = set()
 
+    section = ""
 
-# ______________________________________________________________________________
+    with open(filename) as f:
+        for line in f:
+            content = line.strip()
+
+            if content == "":
+                continue
+
+            if content == "Nodes:":
+                section = "nodes"
+                continue
+            if content == "Edges:":
+                section = "edges"
+                continue
+            if content == "Origin:":
+                section = "origin"
+                continue
+            if content == "Destinations:":
+                section = "destinations"
+                continue
+
+            if section == "nodes":
+                n_id, coords = content.split(":")
+                x, y = coords.strip().strip("()").split(",")
+                nodes[int(n_id.strip())] = (int(x.strip()), int(y.strip()))
+
+            elif section == "edges":
+                n_edges, e_cost = content.split(":")
+                cost = int(e_cost.strip())
+
+                n_from, n_to = n_edges.strip().strip("()").split(",")
+                from_node = int(n_from.strip())
+                to_node = int(n_to.strip())
+
+                if from_node in edges:
+                    edges[from_node].append((to_node, cost))
+                else:
+                    edges[from_node] = [(to_node, cost)]
+
+            elif section == "origin":
+                origin = int(content)
+
+            elif section == "destinations":
+                parts = content.split(";")
+                for part in parts:
+                    part = part.strip()
+                    if part != "":
+                        destinations.add(int(part))
+
+    for from_node in edges:
+        edges[from_node] = sorted(edges[from_node], key=lambda item: item[0])
+
+    return nodes, edges, origin, destinations
 
 
 class Node:
-    """A node in a search tree. Contains a pointer to the parent (the node
-    that this is a successor of) and to the actual state for this node. Note
-    that if a state is arrived at by two paths, then there are two nodes with
-    the same state. Also includes the action that got us to this state, and
-    the total path_cost (also known as g) to reach the node. Other functions
-    may add an f and h value; see best_first_graph_search and astar_search for
-    an explanation of how the f and h values are handled. You will not need to
-    subclass this class."""
-
-    def __init__(self, state, parent=None, action=None, path_cost=0):
-        """Create a search tree Node, derived from a parent by an action."""
+    def __init__(self, state, parent=None, path_cost=0, depth=0, created_order=0):
         self.state = state
         self.parent = parent
-        self.action = action
         self.path_cost = path_cost
-        self.depth = 0
-        if parent:
-            self.depth = parent.depth + 1
+        self.depth = depth
+        self.created_order = created_order
 
-    def __repr__(self):
-        return "<Node {}>".format(self.state)
 
-    def __lt__(self, node):
-        return self.state < node.state
+def build_path(goal_node):
+    path = []
+    current = goal_node
 
-    def expand(self, problem):
-        """List the nodes reachable in one step from this node."""
-        return [self.child_node(problem, action)
-                for action in problem.actions(self.state)]
+    while current is not None:
+        path.append(current.state)
+        current = current.parent
 
-    def child_node(self, problem, action):
-        """[Figure 3.10]"""
-        next_state = problem.result(self.state, action)
-        next_node = Node(next_state, self, action, problem.path_cost(self.path_cost, self.state, action, next_state))
-        return next_node
+    path.reverse()
+    return path
 
-    def solution(self):
-        """Return the sequence of actions to go from the root to this node."""
-        return [node.action for node in self.path()[1:]]
 
-    def path(self):
-        """Return a list of nodes forming the path from the root to this node."""
-        node, path_back = self, []
-        while node:
-            path_back.append(node)
-            node = node.parent
-        return list(reversed(path_back))
 
-    # We want for a queue of nodes in breadth_first_graph_search or
-    # astar_search to have no duplicated states, so we treat nodes
-    # with the same state as equal. [Problem: this may not be what you
-    # want in other contexts.]
-
-    def __eq__(self, other):
-        return isinstance(other, Node) and self.state == other.state
-
-    def __hash__(self):
-        # We use the hash value of the state
-        # stored in the node instead of the node
-        # object itself to quickly search a node
-        # with the same state in a Hash Table
-        return hash(self.state)
-
-def Breadth_first_search(nodes, edges, origin, destination):
+def breadth_first_search(edges, origin, destinations):
     nodes_created = 1
-    root = Node(origin, None,0,0,0)
-    if root.state in destination:
-        return root, nodes_created
-    Frontier = deque([root])   
-    visited = set()
-    while Frontier:
-        current = Frontier.popleft()
-        if current.state in destination:
-            return current, nodes_created
-        
-        if current.state not in visited:
-            visited.add(current.state)
+    root = Node(origin)
 
-            for next_state in edges.get(current.state, []):
-                if next_state not in visited and next_state not in [node.state for node in Frontier]:
-                    child = Node(next_state, current, 0, current.depth + 1, nodes_created)
-                    Frontier.append(child)
-                    nodes_created += 1
+    if root.state in destinations:
+        return root, nodes_created
+    
+    if root.state not in edges:
+        return None,0
+
+    frontier = deque([root])
+    visited = {origin}
+
+    while frontier:
+        current = frontier.popleft()
+
+        if current.state in destinations:
+            return current, nodes_created
+
+        neighbours = edges.get(current.state, [])
+
+        for next_state, _ in neighbours:
+            if next_state not in visited:
+                child = Node(next_state, current, 0, current.depth + 1, nodes_created)
+                nodes_created += 1
+
+                visited.add(next_state)
+                frontier.append(child)
 
     return None, nodes_created
 
 
-def Main():
-    file = sys.argv[1]
-    method = sys.argv[2]
-    if method == "BFS":
-        solution, path, goal = Breadth_first_search()
-        print(f"{file}\n {goal} {solution} \n {path}")
 
-      
+def print_result(filename, method, result_node, nodes_created):
+    print(filename, method)
+
+    #For DLS Cutoff result 
+    if result_node == "CUTOFF":
+        print("CUTOFF", nodes_created)
+        print("DLS: Depth limit reached")
+        return
+
+    if result_node is None:
+        print("None", nodes_created)
+        print("No path found")
+        return
+
+    path = build_path(result_node)
+    print(result_node.state, nodes_created)
+    print(" ".join(str(state) for state in path))
+
+
+def BFS_tests():
+    #test 1 tests if BFS only searches in an area which has connected edges
+    test_graph_1 = {1: [(2,3)], 2:[(3,2)], 3:[(1,4)], 4:[(4,1)]}
+    test_origin_1 = 2
+    test_dest_1 = {3}
+    result, nodes_created = breadth_first_search(test_graph_1,test_origin_1,test_dest_1)
+    path = build_path(result)
+    if path == [2,3]:
+        print("test 1 passed")
+    else:
+        print("test 2 failed")
     
+    #test 2 if BFS returns an error when given an start node that is not in the graph
+    test_graph_2 = {1: [(2,3)], 2:[(3,2)], 3:[(1,4)], 4:[(4,1)]}
+    test_origin_2 = 5
+    test_dest_2 = {3}
+    result, nodes_created = breadth_first_search(test_graph_2,test_origin_2,test_dest_2)
+    if result == None and nodes_created ==  0:
+        print("test 2 passed")
+    else:
+        print("test 2 failed")
+
+    #test 3 if BFS returns an error when given an start node that is not in the graph
+    test_graph_3 = {1: [(2,3)], 2:[(3,2)], 3:[(1,4)], 4:[(4,1)]}
+    test_origin_3 = 2
+    test_dest_3 = {2}
+    result, nodes_created = breadth_first_search(test_graph_3,test_origin_3,test_dest_3)
+    path = build_path(result)
+    if path == [2] and nodes_created == 1:
+        print("test 3 passed")
+    else:
+        print("test 3 failed")
+    
+
+def main():
+    if len(sys.argv) < 3:
+        print("Usage: python search.py <filename> <method> [limit]")
+        sys.exit()
+
+    filename = sys.argv[1]
+    method = sys.argv[2].upper()
+
+    nodes, edges, origin, destinations = parse_file(filename)
+
+    if method == "BFS":
+        result_node, nodes_created = breadth_first_search(edges, origin, destinations)
+    # elif method == "DFS":
+    #     result_node, nodes_created = depth_first_search(edges, origin, destinations)
+    # elif method == "GBFS":
+    #     result_node, nodes_created = greedy_best_first_search(nodes, edges, origin, destinations)
+    # elif  method == "AS":
+    #     result_node, nodes_created = astar_search(nodes, edges, origin, destinations)
+    # elif method == "DLS":
+    #     if len(sys.argv) < 4:
+    #         print("For DLS specify limit: python search.py <filename> DLS <limit>")
+    #         sys.exit()
+
+    #     limit = int(sys.argv[3])
+    #     result_node, nodes_created = depth_limited_search(origin, destinations, edges, limit)
+    # elif  method == "ALT":
+    #     result_node, nodes_created = a_landmark_triangle_inequality_search(nodes, edges, origin, destinations)
+    # else:
+    #     print("Please choose from BFS, DFS, GBFS, AS, DLS <limit>, ALT")
+    #     return
+
+    print_result(filename, method, result_node, nodes_created)
+
+
+if __name__ == "__main__":
+    if len(sys.argv) == 2 and sys.argv[1].upper() == "TEST":
+        BFS_tests()
+    else:
+        main()
