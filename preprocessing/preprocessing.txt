@@ -1,0 +1,5 @@
+https://numpy.org/doc/stable/reference/generated/numpy.where.html
+https://numpy.org/doc/stable/reference/generated/numpy.unique.html
+https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_excel.html
+https://numpy.org/doc/stable/reference/generated/numpy.zeros.html
+https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Timestamp.html
