@@ -5,7 +5,7 @@ import math
 import warnings
 import numpy as np
 import pandas as pd
-from data.data import process_data
+from data import process_data
 from keras.models import load_model
 from keras.utils import plot_model
 import sklearn.metrics as metrics
