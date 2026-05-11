@@ -40,7 +40,7 @@ def process_data(file_path, lag=12, train_ratio=0.8, scats_number=None):
     if scats_number is not None:
         file = file[file['SCATS Number'] == scats_number]
         file = file.reset_index(drop=True)
-        print(f"Filtered to SCATS site: {scats_number} ({len(file) rows)")
+        print(f"Filtered to SCATS site: {scats_number} ({len(file)} rows)")
     
     # Extract locations and dates columns
     locations = file['Location'].values
