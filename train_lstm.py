@@ -85,27 +85,29 @@ def get_all_scats_number(file_path):
 def main():
     scats_numbers = get_all_scats_number(DATA_FILE)
     print(f"Found {len(scats_numbers)} SCATS sites: {scats_numbers}")
-    
-    # Build the LSTM model
-    model = get_lstm(UNITS)
-    model.summary()
+
+    # Print model structure once before the loop
+    get_lstm(UNITS).summary()
     
     for scats_id in scats_numbers:
         # Load and process data
         X_train, y_train, X_test, y_test, scaler = process_data(
             file_path=DATA_FILE,
             lag = 12,
-            scats_numbers = scats_id
+            scats_number = scats_id
         )
         
         # 2. Reshape X to 3D — LSTM requires shape (samples, time_steps, features)
         #    Currently X is (N, 12), we need (N, 12, 1)
         X_train_3d = np.reshape(X_train, (X_train.shape[0], X_train.shape[1], 1))
+
+        # 3. Build fresh model for each site
+        model = get_lstm(UNITS)
         
-        # 3. Train and save
+        # 4. Train and save
         hist = train_model(model, X_train_3d, y_train, f'lstm_{scats_id}', CONFIG)
         
-        # 4. Plot loss curve
+        # 5. Plot loss curve
         plot_loss(hist, f'lstm_{scats_id}')
     
     print(f"\nAll sites trained. Run lstm_main.py to evaluate the model.")
