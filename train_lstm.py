@@ -4,11 +4,11 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from data.process_data import process_data
+from data.process_data import process_data, read_data
 from lstm_model import get_lstm
 
 # Settings
-DATA_FILE = "Scats_Data_Oct_2006.xls"
+DATA_FILE = "data/Scats_Data_Oct_2006.xls"
 UNITS = [12, 64, 64, 1]
 CONFIG = {
     'batch_size': 32,
@@ -68,7 +68,7 @@ def plot_loss(hist, name):
     plt.title(f'{name.upper()} Training Loss Over Epochs')
     plt.xlabel('Epoch')
     plt.ylabel('Loss (MSE)')
-    plt.legend
+    plt.legend()
     plt.grid(True)
     plt.tight_layout()
     
@@ -78,30 +78,37 @@ def plot_loss(hist, name):
     print(f"Loss plot saved to: {save_path}")
     plt.show()
 
+def get_all_scats_number(file_path):
+    df = read_data(file_path)
+    return sorted(df['SCATS Number'].unique())
+
 def main():
-    # Load and process data
-    X_train, y_train, X_test, y_test, scaler = process_data(
-        file_path=DATA_FILE,
-        lag = 12
-    )
+    scats_numbers = get_all_scats_number(DATA_FILE)
+    print(f"Found {len(scats_numbers)} SCATS sites: {scats_numbers}")
     
-    # 2. Reshape X to 3D — LSTM requires shape (samples, time_steps, features)
-    #    Currently X is (N, 12), we need (N, 12, 1)
-    X_train = np.reshape(X_train, (X_train.shape[0], X_train.shape[1], 1))
-    X_test = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], 1))
-    
-    # 3. Build the LSTM model
-    model = get_lstm(UNITS)
+    # Build the LSTM model
     model = get_lstm(UNITS)
     model.summary()
     
-    # 4. Train and save
-    hist = train_model(model, X_train, y_train, 'lstm', CONFIG)
+    for scats_id in scats_numbers:
+        # Load and process data
+        X_train, y_train, X_test, y_test, scaler = process_data(
+            file_path=DATA_FILE,
+            lag = 12,
+            scats_numbers = scats_id
+        )
+        
+        # 2. Reshape X to 3D — LSTM requires shape (samples, time_steps, features)
+        #    Currently X is (N, 12), we need (N, 12, 1)
+        X_train_3d = np.reshape(X_train, (X_train.shape[0], X_train.shape[1], 1))
+        
+        # 3. Train and save
+        hist = train_model(model, X_train_3d, y_train, f'lstm_{scats_id}', CONFIG)
+        
+        # 4. Plot loss curve
+        plot_loss(hist, f'lstm_{scats_id}')
     
-    # 5. Plot loss curve
-    plot_loss(hist, 'lstm')
-    
-    print(f"\nFinished. Run lstm_main.py to evaluate the model.")
+    print(f"\nAll sites trained. Run lstm_main.py to evaluate the model.")
 
 if __name__ == '__main__':
     main()
