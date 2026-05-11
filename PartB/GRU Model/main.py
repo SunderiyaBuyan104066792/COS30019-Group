@@ -94,16 +94,14 @@ def plot_results(y_true, y_preds, names):
 
 
 def main():
-    lstm = load_model('model/970HIGH_STREET_RD_E_of_WARRIGAL_RDgru.h5')
-    gru = load_model('model/gru.h5')
-    saes = load_model('model/saes.h5')
-    models = [lstm, gru, saes]
-    names = ['LSTM', 'GRU']
+    gru = load_model('model/970HIGH_STREET_RD_E_of_WARRIGAL_RDgru.h5',compile=False)
+    models = [gru]
+    names = ['GRU']
 
     lag = 12
-    file1 = '../data/train.csv'
-    file2 = '../data/test.csv'
-    _, _, X_test, y_test, scaler = process_data(file1, file2, lag)
+    file1 = '../SCATS_Data/970/HIGH_STREET_RD_E_of_WARRIGAL_RD/train.csv'
+    file2 = '../SCATS_Data/970/HIGH_STREET_RD_E_of_WARRIGAL_RD/test.csv'
+    _, _, X_test, y_test,_,_, scaler = process_data(file1, file2, lag)
     y_test = scaler.inverse_transform(y_test.reshape(-1, 1)).reshape(1, -1)[0]
 
     y_preds = []
@@ -113,7 +111,7 @@ def main():
         else:
             X_test = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], 1))
         file = 'images/' + name + '.png'
-        plot_model(model, to_file=file, show_shapes=True)
+        #plot_model(model, to_file=file, show_shapes=True)
         predicted = model.predict(X_test)
         predicted = scaler.inverse_transform(predicted.reshape(-1, 1)).reshape(1, -1)[0]
         y_preds.append(predicted[:288])
