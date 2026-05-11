@@ -13,11 +13,10 @@ from sklearn.metrics import (
     r2_score, 
     explained_variance_score
 )
-from data.process_data import process_data
+from data.process_data import process_data, read_data
 
 # Settings
-DATA_FILE = 'Scats_Data_Oct_2006.xls'
-MODEL_PATH = 'model/lstm.h5'
+DATA_FILE = 'data/Scats_Data_Oct_2006.xls'
 
 
 def evaluate(y_true, y_pred, model_name='LSTM'):
@@ -59,7 +58,6 @@ def plot_predictions(y_true, y_pred, model_name='LSTM', n_points=96):
     """
     
     # Create time axis: one full day at 15-min intervals
-    d = '2006-10-01 00:00'
     date = '2006-10-01 00:00'
     x = pd.date_range(date, periods=n_points, freq='15min')
     
@@ -72,7 +70,7 @@ def plot_predictions(y_true, y_pred, model_name='LSTM', n_points=96):
     plt.title(f'{model_name} - Predicted vs Actual Traffic Flow (1 Day)')
     plt.xlabel('Time of Day')
     plt.ylabel('Traffic Flow (vehicles / 15 mins)')
-    plt.legend
+    plt.legend()
     plt.grid(True)
     
     # Format x-axis as HH:MM
@@ -116,43 +114,63 @@ def plot_loss_from_csv(model_name='lstm'):
     print(f"Loss plot saved to: {save_path}")
     plt.show()
 
+def get_all_scats_numbers(file_path):
+    df = read_data(file_path)
+    return sorted(df['SCATS Number'].unique())
+
 def main():
+    scats_numbers = get_all_scats_numbers(DATA_FILE)
+    all_metrics = []
     
-    # 1. Load and process data (same settings as training)
-    X_train, y_train, X_test, y_test, scaler = process_data(
-        filepath = DATA_FILE,
-        lag = 12
-    )
+    for scats_id in scats_numbers:
+        model_name = f'lstm_{scats_id}'
+        model_path = f'model/{model_name}.h5'
+        
+        if not os.path.exists(model_path):
+            print(f"Model not found for site {scats_id} - skipping")
+            continue
     
-    # 2. Reshape X_test to 3D for LSTM: (samples, time_steps, features)
-    X_test_3d = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], 1))
+        print(f"\n--- Evaluating LSTM for SCATS site {scats_id} ---")
+        # 1. Load and process data (same settings as training)
+        X_train, y_train, X_test, y_test, scaler = process_data(
+            file_path = DATA_FILE,
+            lag = 12,
+            scats_number=scats_id
+        )
+        
+        # 2. Reshape X_test to 3D for LSTM: (samples, time_steps, features)
+        X_test_3d = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], 1))
+        
+        # 3. Inverse transform y_test back to real traffic values
+        y_true = scaler.inverse_transform(y_test.reshape(-1, 1)).flatten()
+        
+        model = load_model(model_path)
+        print(f"Model loaded from {model_path}")
+        
+        # 5. Predict
+        y_pred_scaled = model.predict(X_test_3d)
+        
+        # 6. Inverse transform predictions back to real traffic values
+        y_pred = scaler.inverse_transform(y_pred_scaled.reshape(-1, 1)).flatten()
+        
+        # 7.Evaluate
+        metrics = evaluate(y_true, y_pred, model_name=model_name)
+        metrics['scats_id'] = scats_id
+        all_metrics.append(metrics)
+        
+        # 8. Plot predicted vs actual
+        plot_predictions(y_true, y_pred, model_name=model_name)
+        
+        # 9. Re-plot loss curve from saved CSV
+        plot_loss_from_csv(model_name=model_name)
     
-    # 3. Inverse transform y_test back to real traffic values
-    #    (it was normalized during process_data)
-    y_true = scaler.inverse_transform(y_test.reshape(-1, 1)).flatten()
-    
-    if not os.path.exists(MODEL_PATH):
-        print(f"Model not found at {MODEL_PATH}")
-        print("Run train_lstm.py first")
-        return
-    
-    model = load_model(MODEL_PATH)
-    print(f"Model loaded from {MODEL_PATH}")
-    
-    # 5. Predict
-    y_pred_scaled = model.predict(X_test_3d)
-    
-    # 6. Inverse transform predictions back to real traffic values
-    y_pred = scaler.inverse_transform(y_pred_scaled.reshape(-1, 1)).flatten()
-    
-    # 7.Evaluate
-    metrics = evaluate(y_true, y_pred, model_name='LSTM')
-    
-    # 8. Plot predicted vs actual
-    plot_predictions(y_true, y_pred, model_name='LSTM', n_points=96)
-    
-    # 9. Re-plot loss curve from saved CSV
-    plot_loss_from_csv(model_name='lstm')
+    if all_metrics:
+        print("\n--- Summary: All SCATS Sites ---")
+        df_summary = pd.DataFrame(all_metrics)
+        df_summary = df_summary.set_index('scats_id')
+        print(df_summary.to_string())
+        df_summary.to_csv('model/lstm_all_sites_metrics.csv')
+        print("\nSummary saved to model/lstm_all_sites_metrics.csv")
 
 if __name__ == '__main__':
     main()
