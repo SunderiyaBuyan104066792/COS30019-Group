@@ -29,7 +29,7 @@ def train_model(model, X_train, y_train, name, config):
     # loss='mse'       : Mean Squared Error, standard for regression
     # optimizer='adam' : adaptive learning rate, works well in most cases
     # metrics=['mae']  : also track Mean Absolute Error during training
-    model.compile(loss='mse', optimizer='adam', metrics=['mape'])
+    model.compile(loss='mse', optimizer='adam', metrics=['mae'])
     
     print(f"\nTraining {name.upper()} model...")
     print(f"  Epochs:     {config['epochs']}")
