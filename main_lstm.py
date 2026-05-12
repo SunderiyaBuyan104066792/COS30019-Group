@@ -144,7 +144,8 @@ def main():
         # 3. Inverse transform y_test back to real traffic values
         y_true = scaler.inverse_transform(y_test.reshape(-1, 1)).flatten()
         
-        model = load_model(model_path)
+        model = load_model(model_path, compile=False)
+        model.compile(loss='mse', optimizer='adam')
         print(f"Model loaded from {model_path}")
         
         # 5. Predict
