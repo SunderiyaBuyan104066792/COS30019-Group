@@ -3,15 +3,18 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from data.process_data import process_data, read_data
+from keras.callbacks import EarlyStopping
+from data.process_data import process_data_multi, read_data
 from lstm_model import get_lstm
+from cluster_config import get_cluster_map
 
 # Settings
 DATA_FILE = "data/Scats_Data_Oct_2006.xls"
+N_CLUSTERS = 5
 UNITS = [12, 64, 64, 1]
 CONFIG = {
     'batch_size': 32,
-    'epochs': 50,
+    'epochs': 200,
 }
 
 
@@ -31,15 +34,24 @@ def train_model(model, X_train, y_train, name, config):
     # metrics=['mae']  : also track Mean Absolute Error during training
     model.compile(loss='mse', optimizer='adam', metrics=['mae'])
     
-    print(f"\nTraining {name.upper()} model...")
+    print(f"\nTraining {name.upper()} ...")
     print(f"  Epochs:     {config['epochs']}")
     print(f"  Batch size: {config['batch_size']}")
     print(f"  Train size:  {len(X_train)}\n")
     
-    hist = model.fit(X_train, y_train,
+    early_stop = EarlyStopping(
+        monitor='val_loss',
+        patience=10,
+        restore_best_weights=True,
+        verbose=1
+    )
+    
+    hist = model.fit(
+            X_train, y_train,
             batch_size=config['batch_size'],
             epochs=config['epochs'],
             validation_split=0.05,
+            callbacks=[early_stop],
             verbose=1
     )
     
@@ -50,16 +62,13 @@ def train_model(model, X_train, y_train, name, config):
     
     df_loss = pd.DataFrame(hist.history)
     csv_path = os.path.join('model', name + '_loss.csv')
-    df_loss.to_csv(csv_path, index=False, encoding='utf-8')
+    df_loss.to_csv(csv_path, index=False)
     print(f"Loss history saved to: {csv_path}")
     
     return hist
 
 def plot_loss(hist, name):
-    """
-    Plot training loss vs validation loss and save as image.
-    Use this graph in your report's Insights section.
-    """
+    # Plot training loss vs validation loss and save as image.
     
     plt.figure(figsize=(10, 4))
     plt.plot(hist.history['loss'], label='Train Loss')
@@ -76,40 +85,52 @@ def plot_loss(hist, name):
     plt.savefig(save_path)
     print(f"Loss plot saved to: {save_path}")
     plt.show()
-
-def get_all_scats_number(file_path):
-    df = read_data(file_path)
-    return sorted(df['SCATS Number'].unique())
+    plt.pause(5)
+    plt.close()
 
 def main():
-    scats_numbers = get_all_scats_number(DATA_FILE)
-    print(f"Found {len(scats_numbers)} SCATS sites: {scats_numbers}")
+    # 1. Build cluster map
+    cluster_map = get_cluster_map(DATA_FILE, n_clusters=N_CLUSTERS)
+    print(f"\nFound {len(cluster_map)} geographic clusters:")
+    for cid, scats_list in cluster_map.items():
+        print(f"   Cluster {cid}: {len(scats_list)} sites: {scats_list}")
 
     # Print model structure once before the loop
+    print()
     get_lstm(UNITS).summary()
     
-    for scats_id in scats_numbers:
-        # Load and process data
-        X_train, y_train, X_test, y_test, scaler = process_data(
+    total_clusters = len(cluster_map)
+    
+    # 2. Train one model per cluster
+    for cluster_id, scats_list in cluster_map.items():
+        model_name = f'lstm_cluster_{cluster_id}'
+        print(f"\n{'-'*10}")
+        print(f"   Cluster {cluster_id + 1}/{total_clusters} - {model_name}")
+        print(f"   Sites: {scats_list}")
+        print(f"{'-'*10}")
+        
+        # Pool data from all sites in this cluster
+        X_train, y_train, X_test, y_test, scaler = process_data_multi(
             file_path=DATA_FILE,
-            lag = 12,
-            scats_number = scats_id
+            scats_list=scats_list,
+            lag=4
         )
         
-        # 2. Reshape X to 3D — LSTM requires shape (samples, time_steps, features)
-        #    Currently X is (N, 12), we need (N, 12, 1)
-        X_train_3d = np.reshape(X_train, (X_train.shape[0], X_train.shape[1], 1))
-
-        # 3. Build fresh model for each site
+        # LSTM needs 3-D input: (samples, time_steps, features)
+        X_train_3d = X_train.reshape(X_train.shape[0], X_train.shape[1], 1)
+        
+        # Fresh model for each cluster (no weight leakage between clusters)
         model = get_lstm(UNITS)
         
-        # 4. Train and save
-        hist = train_model(model, X_train_3d, y_train, f'lstm_{scats_id}', CONFIG)
+        hist = train_model(model, X_train_3d, y_train, model_name, CONFIG)
+        plot_loss(hist, model_name)
         
-        # 5. Plot loss curve
-        plot_loss(hist, f'lstm_{scats_id}')
+        print(f"\n   Cluster {cluster_id} done.")
     
-    print(f"\nAll sites trained. Run lstm_main.py to evaluate the model.")
+    print(f"{'-'*10}")
+    print(f"\nAll {total_clusters} cluster models trained.")
+    print(f"Run main_lstm.py to evaluate them.")
+    print(f"{'-'*10}")
 
 if __name__ == '__main__':
     main()
