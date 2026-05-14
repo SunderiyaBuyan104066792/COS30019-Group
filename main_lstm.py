@@ -13,10 +13,12 @@ from sklearn.metrics import (
     r2_score, 
     explained_variance_score
 )
-from data.process_data import process_data, read_data
+from data.process_data import process_data_multi, read_data
+from cluster_config import get_cluster_map
 
 # Settings
 DATA_FILE = 'data/Scats_Data_Oct_2006.xls'
+N_CLUSTERS = 5
 
 
 def evaluate(y_true, y_pred, model_name='LSTM'):
@@ -65,7 +67,7 @@ def plot_predictions(y_true, y_pred, model_name='LSTM', n_points=96):
     
     ax.plot(x, y_true[:n_points], label='Actual')
     ax.plot(x, y_pred[:n_points], label='Predicted', 
-            linewidth=1.5, linestyle='--', color='steelblue')
+            linewidth=1.5, color='red')
     
     plt.title(f'{model_name} - Predicted vs Actual Traffic Flow (1 Day)')
     plt.xlabel('Time of Day')
@@ -85,12 +87,11 @@ def plot_predictions(y_true, y_pred, model_name='LSTM', n_points=96):
     plt.savefig(save_path)
     print(f"\nPrediction plot saved to: {save_path}")
     plt.show()
+    plt.pause(5)
+    plt.close()
 
 def plot_loss_from_csv(model_name='lstm'):
-    """
-    Load the saved loss CSV and re-plot the training loss curve.
-    Useful if you want to re-generate the plot without retraining.
-    """
+    # Load the saved loss CSV and re-plot the training loss curve.
     
     csv_path = f'model/{model_name}_loss.csv'
     if not os.path.exists(csv_path):
@@ -113,65 +114,79 @@ def plot_loss_from_csv(model_name='lstm'):
     plt.savefig(save_path)
     print(f"Loss plot saved to: {save_path}")
     plt.show()
-
-def get_all_scats_numbers(file_path):
-    df = read_data(file_path)
-    return sorted(df['SCATS Number'].unique())
+    plt.pause(5)
+    plt.close()
 
 def main():
-    scats_numbers = get_all_scats_numbers(DATA_FILE)
+    cluster_map = get_cluster_map(DATA_FILE, n_clusters=N_CLUSTERS)
     all_metrics = []
+    all_predictions = []
     
-    for scats_id in scats_numbers:
-        model_name = f'lstm_{scats_id}'
+    for cluster_id, scats_list in cluster_map.items():
+        model_name = f'lstm_cluster_{cluster_id}'
         model_path = f'model/{model_name}.h5'
         
+        print(f"{'-'*10}")
+        print(f"   Cluster: {cluster_id} - {model_name}")
+        print(f"   Sites: {scats_list}")
+        print(f"{'-'*10}")
+        
         if not os.path.exists(model_path):
-            print(f"Model not found for site {scats_id} - skipping")
+            print(f"\n  Model not found at {model_path} - skipping")
             continue
-    
-        print(f"\n--- Evaluating LSTM for SCATS site {scats_id} ---")
-        # 1. Load and process data (same settings as training)
-        X_train, y_train, X_test, y_test, scaler = process_data(
-            file_path = DATA_FILE,
-            lag = 12,
-            scats_number=scats_id
+        
+        # 1. Reconstruct test data (same settings as training)
+        _, _, X_test, y_test, scaler = process_data_multi(
+            file_path=DATA_FILE,
+            scats_list=scats_list,
+            lag=4
         )
         
-        # 2. Reshape X_test to 3D for LSTM: (samples, time_steps, features)
-        X_test_3d = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], 1))
-        
-        # 3. Inverse transform y_test back to real traffic values
-        y_true = scaler.inverse_transform(y_test.reshape(-1, 1)).flatten()
-        
-        model = load_model(model_path, compile=False)
+        # 2. Load model (compile=False avoids legacy .h5 deserialization bug)
+        model= load_model(model_path, compile=False)
         model.compile(loss='mse', optimizer='adam')
-        print(f"Model loaded from {model_path}")
+        print(f"\n  Model loaded from {model_path}")
         
-        # 5. Predict
+        # 3. Reshape for LSTM and predict
+        X_test_3d = X_test.reshape(X_test.shape[0], X_test.shape[1], 1)
+        
+        y_true_scaled = y_test
         y_pred_scaled = model.predict(X_test_3d)
         
-        # 6. Inverse transform predictions back to real traffic values
+        # 4. Inverse-transform to real vehicle count
+        y_true = scaler.inverse_transform(y_true_scaled.reshape(-1, 1)).flatten()
         y_pred = scaler.inverse_transform(y_pred_scaled.reshape(-1, 1)).flatten()
         
-        # 7.Evaluate
+        # Store for summary plot
+        all_predictions.append({        
+            'cluster_id': cluster_id,
+            'y_true': y_true,
+            'y_pred': y_pred,
+        })
+        
+        # 5. Evaluate
         metrics = evaluate(y_true, y_pred, model_name=model_name)
-        metrics['scats_id'] = scats_id
+        metrics['cluster_id'] = cluster_id
+        metrics['n_sites'] = len(scats_list)
+        metrics['scats_sites'] = str(scats_list)
         all_metrics.append(metrics)
         
-        # 8. Plot predicted vs actual
+        # 6. Plots
         plot_predictions(y_true, y_pred, model_name=model_name)
-        
-        # 9. Re-plot loss curve from saved CSV
-        plot_loss_from_csv(model_name=model_name)
+        plot_loss_from_csv(model_name)
     
+    # Summary
     if all_metrics:
-        print("\n--- Summary: All SCATS Sites ---")
-        df_summary = pd.DataFrame(all_metrics)
-        df_summary = df_summary.set_index('scats_id')
-        print(df_summary.to_string())
-        df_summary.to_csv('model/lstm_all_sites_metrics.csv')
-        print("\nSummary saved to model/lstm_all_sites_metrics.csv")
+        print(f"\n{'-'*10}")
+        print("Summary: All Clusters Models")
+        print(f"{'-'*10}")
+        df_summary = pd.DataFrame(all_metrics).set_index('cluster_id')
+        print(df_summary[['n_sites', 'MAE', 'RMSE', 'MAPE', 'R2', 'EVS']].to_string())
+        
+        os.makedirs('model', exist_ok=True)
+        out_path = 'model/lstm_cluster_metrics.csv'
+        df_summary.to_csv(out_path)
+        print(f"\nSummary saved to {out_path}")
 
 if __name__ == '__main__':
     main()
