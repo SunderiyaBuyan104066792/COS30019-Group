@@ -22,9 +22,9 @@ def process_data(train, test, lags):
 
     train = np.array(train)
     test  = np.array(test)
-
+    np.random.shuffle(train)
     idx = np.random.permutation(len(train))
-    train = train[idx]
+    #train = train[idx]
     #volumes
     X_train = train[:, :-1]
     y_train = train[:, -1]
