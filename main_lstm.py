@@ -18,7 +18,7 @@ from cluster_config import get_cluster_map
 
 # Settings
 DATA_FILE = 'data/Scats_Data_Oct_2006.xls'
-N_CLUSTERS = 5
+N_CLUSTERS = 5   # Can be changed but must match cluster_config.N_CLUSTERS
 
 
 def evaluate(y_true, y_pred, model_name='LSTM'):
