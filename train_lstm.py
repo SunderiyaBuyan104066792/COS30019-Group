@@ -4,7 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from keras.callbacks import EarlyStopping
-from data.process_data import process_data_multi, read_data
+from data.process_data import process_data_multi
 from lstm_model import get_lstm
 from cluster_config import get_cluster_map
 
