@@ -5,11 +5,16 @@ from sklearn.cluster import KMeans
 
 
 # Settings
-N_CLUSTERS = 5
+N_CLUSTERS = 5     # Number of geographic areas
 RANDOM_STATE = 42
 
 
 def get_site_coords(file_path):
+    """
+    Return a DataFrame with columns:
+        SCATS Number | Location | Lat | Lon
+    """
+    
     df = pd.read_excel(file_path, sheet_name='Data', engine='xlrd', header=1)
     df = df.iloc[1:].reset_index(drop=True)
     
@@ -24,6 +29,15 @@ def get_site_coords(file_path):
     return sites
 
 def build_clusters(file_path, n_clusters = N_CLUSTERS, random_state = RANDOM_STATE):
+    """
+    Cluster all SCATS sites by geographic proximity.
+ 
+    Returns
+    -------
+    pd.DataFrame with columns:
+        SCATS Number | Location | Lat | Lon | cluster
+    """
+    
     sites = get_site_coords(file_path)
     
     coords = sites[['Lat', 'Lon']].values
@@ -35,6 +49,15 @@ def build_clusters(file_path, n_clusters = N_CLUSTERS, random_state = RANDOM_STA
     return sites
 
 def get_cluster_map(file_path, **kwargs):
+    """
+    Convenience helper used by train_lstm.py and main_lstm.py.
+ 
+    Returns
+    -------
+    dict mapping cluster_id (int) -> sorted list of SCATS Numbers
+    e.g. {0: [2820, 3001, ...], 1: [2200, 3126, ...], ...}
+    """
+    
     df = build_clusters(file_path, **kwargs)
     cluster_map = {}
     for cluster_id, group in df.groupby('cluster'):
