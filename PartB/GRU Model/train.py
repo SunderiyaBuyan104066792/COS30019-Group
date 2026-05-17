@@ -27,11 +27,12 @@ def train_model(model, X_train, y_train, name, config, scat, location):
         config: Dict, parameter for train.
     """
 
-    model.compile(loss="mse", optimizer="rmsprop", metrics=['mape'])
+    model.compile(loss="mse", optimizer="rmsprop", metrics=['mae'])
+    checkpoint_path = f"model/{scat}-{location}-{name}.h5"
     #used to stop model early if no changes to value loss after 30 epochs
     early = EarlyStopping(monitor='val_loss', patience=30, verbose=0, mode='auto', restore_best_weights=False)
     #saving best model incase model starts to overfit.
-    checkpoint = ModelCheckpoint("model.h5", monitor="val_loss", mode="min", save_best_only=True, verbose=1)
+    checkpoint = ModelCheckpoint(checkpoint_path, monitor="val_loss", mode="min", save_best_only=True, verbose=1)
     hist = model.fit(
         X_train, y_train,
         batch_size=config["batch"],
@@ -39,7 +40,6 @@ def train_model(model, X_train, y_train, name, config, scat, location):
         validation_split=0.05,
         callbacks =[early, checkpoint])
     #saving model under model directiory with the scat number and loc ation the model is trained on
-    model.save('model/' + scat + "-" + location + "-" + name + '.h5')
     df = pd.DataFrame.from_dict(hist.history)
     df.to_csv('model/' + name + ' loss.csv', encoding='utf-8', index=False)
 
@@ -57,7 +57,7 @@ def main(argv):
     lag = 12
     config = {"batch": 256, "epochs": 600}
     #loop for creating a model for every location in every scat
-    for scat in os.listdir("../SCATS_Data"):
+    for scat in sorted(os.listdir("../SCATS_Data"), key=int):
         for location in os.listdir(os.path.join("../SCATS_Data", scat)):
             file1 = os.path.join("../SCATS_Data", scat, location, "train.csv")
             file2 = os.path.join("../SCATS_Data", scat, location, "test.csv")

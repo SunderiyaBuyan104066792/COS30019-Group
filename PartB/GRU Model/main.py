@@ -94,7 +94,7 @@ def plot_results(y_true, y_preds, names):
 
 
 def main():
-    gru = load_model('model/970HIGH_STREET_RD_E_of_WARRIGAL_RDgru.h5',compile=False)
+    gru = load_model('model/970-HIGH_STREET_RD_E_of_WARRIGAL_RD-gru-.h5',compile=False)
     models = [gru]
     names = ['GRU']
 
