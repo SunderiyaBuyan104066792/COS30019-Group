@@ -33,34 +33,49 @@ valid = np.zeros(len(y), dtype=bool)
 valid[N_LAGS:] = locations[:-N_LAGS] == locations[N_LAGS:]
 x, lags, y = x[valid], lags[valid], y[valid]
 
-# Normalize. Lags share the target's scale so use y's stats for them too.
+
+# I can change it to min max if needed
+# Normalize, using z-score normalization: https://www.geeksforgeeks.org/data-analysis/z-score-normalization-definition-and-examples/
+# mean = 0
+# sd = 1
 x_mean, x_std = x.mean(0), x.std(0) + 1e-8
 y_mean, y_std = y.mean(), y.std() + 1e-8
+
+# actual z-score
 x_n = (x - x_mean) / x_std
 y_n = (y - y_mean) / y_std
-lags_n = ((lags - y_mean) / y_std)[..., None]  # add channel dim for Conv1D
 
-# Shuffle so validation_split doesn't carve off entire locations.
+# reshapes for Conv1D
+lags_n = ((lags - y_mean) / y_std)[..., None]  
+
+# Shuffle so validation_split doesn't carve off entire locations - so that validation can take from random values
 rng = np.random.default_rng(42)
 perm = rng.permutation(len(y_n))
 x_n, lags_n, y_n = x_n[perm], lags_n[perm], y_n[perm]
 
+# creating the model
 model = DFF.CustomModel(n_lags=N_LAGS)
+
+# compiling the model
 model.compile(optimizer=tf.keras.optimizers.Adam(1e-4),
     loss='mse', metrics=['mse'])
 
+# training the model
 history = model.fit([x_n, lags_n], y_n,
     epochs=50, batch_size=512, validation_split=0.2)
 
+# just for you to see the outcome of the model
+# will plot the training loss and validation loss
 plt.plot(history.history['loss'], label='train loss')
 plt.plot(history.history['val_loss'], label='val loss')
 plt.xlabel('epoch')
 plt.ylabel('loss (normalized MSE)')
 plt.legend()
+
 #plt.savefig('loss.png', dpi=150)
 plt.show()
 
 model.save('model.keras')
 
-# Save normalization stats so inference can undo them later
+# Save normalization stats so inference can undo them later - for postprocessing
 np.savez('norm.npz', x_mean=x_mean, x_std=x_std, y_mean=y_mean, y_std=y_std)

@@ -1,119 +1,131 @@
-import numpy as np
-import math
-import h5py
-import os
-import pandas as pd
 import sys
-from sklearn.preprocessing import MinMaxScaler
+import warnings
+import argparse
+import numpy as np
+import pandas as pd
 
 
 
 # First we have to load the dataset:
-def read_data(file_path):
-    # we use pd.read_excel documentation to understand sheet_name = tab, and engine
-    #Read excel file
-    file = pd.read_excel(file_path, sheet_name='Data', engine='xlrd', header=1)
-    file = file.iloc[1:]  # skip metadata row
-    file = file.reset_index(drop=True)
+# we use pd.read_excel documentation to understand sheet_name = tab, and engine
 
-    return file
 
-def create_sequences(data, lag):
-    """
-    Create (X, y) pairs from a 1D normalised time series.
-    Used by LSTM and GRU — they need sequences of past `lag` steps.
+#Read excel file
+file = pd.read_excel('Scats Data October 2006.xls', sheet_name=1, engine='calamine')
 
-    Returns
-    -------
-    X : ndarray, shape (N, lag)
-    y : ndarray, shape (N,)
-    """
-    X, y = [], []
-    for i in range(len(data) - lag):
-        X.append(data[i : i + lag])
-        y.append(data[i + lag])
-    return np.array(X), np.array(y)
 
-def process_data(file_path, lag=12, train_ratio=0.8, scats_number=None):
-    file = read_data(file_path)
+#Select columns to be used as input
+input_idxs = [1, 9]
+columns_names = ['LOCATION', 'DATE']
 
-    if scats_number is not None:
-        file = file[file['SCATS Number'] == scats_number]
-        file = file.reset_index(drop=True)
-        print(f"Filtered to SCATS site: {scats_number} ({len(file)} rows)")
-    
-    # Extract locations and dates columns
-    locations = file['Location'].values
-    dates = file['Date'].values
-    
-    # Map each unique location to a numeric ID
-    unique_locations = np.unique(locations)
-    x1 = np.zeros(len(locations))
-    for i, n in enumerate(unique_locations): # gives you an index of the unique value based on its index in uniques. 
-        indices = np.where(n == locations)[0]
-        x1[indices] = i
-    
-    
-    # instead of storing each date, we should store day of the week, as we are making a prediction of traffic based on day of the week, not day of the month. 
-    # for each unique date, we convert the date to an integer (0-6) and assign the integers a day-of-week value
-    unique_dates = np.unique(dates)
-    x2 = np.zeros(len(dates))
-    for i, n in enumerate(unique_dates):
-        indices = np.where(n == dates)[0]
-        x2[indices] = pd.Timestamp(n).dayofweek
-    
-    # right now we have one value per day, per site- now we need to consider one value per day, per time, per site
-    
-    
-    # we also need to look at the time interval (not a column)
-    num_rows = len(locations) # current number of rows after x1 and x2
-    x1_expanded = np.zeros(num_rows * 96) # each need a time interval (96 values)
-    x2_expanded = np.zeros(num_rows * 96)
-    x3 = np.zeros(num_rows * 96)
-    
-    for row_idx in range(num_rows): # 0 -> num_rows
-        for slot in range(96): # 0 -> 96
-            out_idx = row_idx * 96 + slot # position in expanded array - slot is time interval
-            x1_expanded[out_idx] = x1[row_idx]
-            x2_expanded[out_idx] = x2[row_idx]
-            x3[out_idx] = slot
+#Get column names- from column header
+column_names = file.columns[input_idxs]
 
-    # Extract traffic flow values V00-V95 as target y
-    flow_cols = ['V%02d' % i for i in range(96)]
-    flow = file[flow_cols].values.flatten().astype(float)
-    scaler = MinMaxScaler()
-    flow_scaled = scaler.fit_transform(flow.reshape(-1, 1)).flatten()
 
-    def split_data(X, y):
-        s = int(len(X) * train_ratio)
-        return X[:s], y[:s], X[s:], y[s:]
-    
-    # Build sequences for LSTM / GRU
-    X_seq, y_seq = create_sequences(flow_scaled, lag)
+# to build our y_train data
+# we need to create something to grab the row names for the time intervals
+labels = []
 
-    X_train_seq, y_train_seq, X_test_seq, y_test_seq = split_data(X_seq, y_seq)
-    print(f"Total samples:   {len(flow_scaled)}")
-    print(f"LSTM/GRU train:  {len(X_train_seq)}  |  test: {len(X_test_seq)}  |  shape: {X_train_seq.shape}")
-    
-    # Combine into final input matrix
-    inputs = np.array([x1_expanded, x2_expanded, x3]).T
+for row in range(1, file.shape[0]): # our file shape is (rows=4193, columns=106)
 
-    return X_train_seq, y_train_seq, X_test_seq, y_test_seq, scaler
+    # using iloc =https://www.geeksforgeeks.org/pandas/python-extracting-rows-using-pandas-iloc/
+    # parameters = index position of rows in int or list of int
+    # we are usng it to return the row as one value per column
+    # slice at position 10 (from here these are the time intervals)
+    # temp holds the 96 vehicle counts for that site, date
+    # to_numpy() converts to 1D array
+    temp = file.iloc[row][10:].to_numpy() 
 
-if __name__ == '__main__':
-    X_train_seq, y_train_seq, X_test_seq, y_test_seq, scaler = process_data('Scats_Data_Oct_2006.xls', lag = 12)
-    
-    # for testing purposes, we print only the first 10 rows. 
-    print(f"X_train shape: {X_train_seq.shape}")
-    print(f"y_train shape: {y_train_seq.shape}")
-    print(f"X_test  shape: {X_test_seq.shape}")
-    print(f"y_test  shape: {y_test_seq.shape}")
-    
+    # labels is a list of the rows, each with 96 values
+    labels.append(temp)
+
+# convert the list into one 2D numpy array shape(4193, 96)
+labels = np.array(labels)
+
+# flattern to 1D - so later preprocessing can have the same positions. 
+labels = labels.flatten()
+
+# we also need to sort it specifically for keras 
+# wraps the label in [] then converts it back to numpy array
+# this creates a 2D array with one element per column
+labels = np.array([[label] for label in labels])
+
+# labels is now a (num of elements, 1) 2D array
+
+
+
+# same with the values
+
+
+
+#List of column values- iterates over the selected column names and appends the values into a NumPy array
+inputs = []
+
+for i in column_names:
+    inputs.append(file[i].values)
+
+
+
+#List of unique values in each columns
+uniques = []
+
+
+#skips row 0, because it is header information - np.unique() is used to give the sorted array of unique values within the columnm and the index of the first of that unique value
+for i in inputs:
+    u, indices = np.unique(i[1:], return_index=True)
+    uniques.append(u)
+# uniques will have two values = location, date -> this step does not sort the values. 
+
+
+#Assigns unique number to each unique column value
+# for each unique location, find a row where that location appears and assign label equal to its index - each scats site (location) is maped to an ID 
+x1 = np.zeros(len(inputs[0][1:]))
+
+for i, n in enumerate(uniques[0]): # gives you an index of the unique value based on its index in uniques. 
+    indices = np.where(n == inputs[0][1:])[0]
+    x1[indices] = i
+
+
+# instead of storing each date, we should store day of the week, as we are making a prediction of traffic based on day of the week, not day of the month. 
+# for each unique date, we convert the date to an integer (0-6) and assign the integers a day-of-week value
+x2 = np.zeros(len(inputs[1][1:]))
+
+for i, n in enumerate(uniques[1]):
+    indices = np.where(n == inputs[1][1:])[0]
+    x2[indices] = pd.Timestamp(n).dayofweek
+
+# right now we have one value per day, per site- now we need to consider one value per day, per time, per site
+
+
+# we also need to look at the time interval (not a column)
+num_rows = len(inputs[0][1:]) # current number of rows after x1 and x2
+
+x1_expanded = np.zeros(num_rows * 96) # each need a time interval (96 values)
+x2_expanded = np.zeros(num_rows * 96)
+x3 = np.zeros(num_rows * 96)
+
+for row_idx in range(num_rows): # 0 -> num_rows
+
+
+    for time_int in range(96): # 0 -> 96
+
+
+        out_idx = row_idx * 96 + time_int # position in expanded array - slot is time interval
+
+        x1_expanded[out_idx] = x1[row_idx]
+        x2_expanded[out_idx] = x2[row_idx]
+        x3[out_idx] = time_int
+
+# Combine into final input matrix
+inputs = np.array([x1_expanded, x2_expanded, x3]).T
+
+
+np.savetxt('train_x.csv', inputs)
+np.savetxt('train_y.csv', labels)
+
 
 
 # further preprocessing:
-
-
 
 
 # What inputs does a deep forward feed require:
@@ -126,7 +138,12 @@ if __name__ == '__main__':
 # past vehicle counts- only necessary for DFF
 
 
+
 # post processing:
 # the site types are hard to consider as they do not effect the intersections, which is all of the excel data.
 # we could implement it either as a penalty to the calculated travel time (eg. school zones will only allow speed of 40km/h), or assign adjacent scats data the characteristic (I'm not really sure how that could change it too much)
 
+
+
+
+#
