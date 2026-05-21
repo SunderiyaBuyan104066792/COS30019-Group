@@ -1,0 +1,21 @@
+# Trained models — too large for git
+AI-A2/model/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+
+# Data files
+data/SCATS_Data/
+
+#Models
+trained_models/
+
+
+data/Scats Data October 2006.xls
+
+site_road_data/
+
+trained_models.zip
