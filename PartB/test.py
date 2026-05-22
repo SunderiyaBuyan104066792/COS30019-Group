@@ -1,6 +1,8 @@
 import os
+import sys
 import math
 import warnings
+import argparse
 import numpy as np
 import pandas as pd
 from data.preprocessing import process_data, process_data_custom
@@ -143,57 +145,104 @@ def evaluate_all():
             continue
         df = pd.DataFrame(res)
         print(f'\n{model_name.upper()} ({len(res)} directions):')
-        print(f' MAE:  {df["mae"].mean():.4f}')
+        print(f' MAE:{df["mae"].mean():.4f}')
         print(f' RMSE: {df["rmse"].mean():.4f}')
         print(f' MAPE: {df["mape"].mean():.4f}%')
         print(f'R2:   {df["r2"].mean():.4f}')
 
 
-def main():
-    # Evaluate on one direction for example
-    site = '4321'
-    direction = 'HIGH_ST_NE_OF_HARP_ST'
+def pick_direction(site):
+
+    site_path  = os.path.join('data/SCATS_Data', str(site))
+    directions = sorted([
+        d for d in os.listdir(site_path)
+        if os.path.isdir(os.path.join(site_path, d))
+    ])
+ 
+    if not directions:
+        print(f'No directions found for site {site}.')
+        sys.exit(1)
+ 
+    print(f'\nAvailable directions for site {site}:')
+    for i, d in enumerate(directions, 1):
+        print(f'  {i}. {d}')
+ 
+    while True:
+        try:
+            choice = int(input('\nEnter number: '))
+            if 1 <= choice <= len(directions):
+                return directions[choice - 1]
+            print(f'Please choose a number between 1 and {len(directions)}.')
+        except ValueError:
+            print('Invalid input, choose from above options')
+ 
+ 
+def main(argv):
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--scats',
+        type=int,
+        default=None,
+        help='SCATS site number e.g. 970 (omit to enter interactively)')
+    args = parser.parse_args()
+
+    if args.scats is not None:
+        site = args.scats
+    else:
+        while True:
+            try:
+                site = int(input('\nEnter SCATS site number: '))
+                if os.path.isdir(os.path.join('data/SCATS_Data', str(site))):
+                    break
+                print(f'Site {site} not found in data/SCATS_Data/.')
+            except ValueError:
+                print('Invalid input, enter a number.')
+
+    # Interactive direction selection
+    direction  = pick_direction(site)
 
     train_path = f'data/SCATS_Data/{site}/{direction}/train.csv'
     test_path = f'data/SCATS_Data/{site}/{direction}/test.csv'
-
+ 
     _, _, X_test, y_test, scaler = process_data(train_path, test_path, LAGS)
     y_test = scaler.inverse_transform(y_test.reshape(-1, 1)).reshape(1, -1)[0]
-
-    models = [
-        load_model(f'trained_models/{site}/{direction}/lstm.h5', compile=False),
-        load_model(f'trained_models/{site}/{direction}/gru.h5', compile=False),
-    ]
-    names = ['LSTM', 'GRU']
-
+ 
     y_preds = []
-    for name, model in zip(names, models):
-        X = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], 1))
+    names   = []
+ 
+    # LSTM and GRU
+    for model_name in ['lstm', 'gru']:
+        model_path = f'trained_models/{site}/{direction}/{model_name}.h5'
+        if not os.path.exists(model_path):
+            print(f'\n{model_name.upper()}: model not found, skipping.')
+            continue
+ 
+        model     = load_model(model_path, compile=False)
+        X         = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], 1))
         predicted = model.predict(X, verbose=0)
         predicted = scaler.inverse_transform(predicted.reshape(-1, 1)).reshape(1, -1)[0]
         y_preds.append(predicted)
-        print(name)
+        names.append(model_name.upper())
+        print(f'\n{model_name.upper()}:')
         eva_regress(y_test, predicted)
-
-
-
-    # for the custom model:
+ 
+    # Custom model — uses two inputs [Xf, Xl]
     custom_path = f'trained_models/{site}/{direction}/custom.h5'
     if os.path.exists(custom_path):
-        _, _, _, Xf, Xl, _, scaler= process_data_custom(train_path, test_path, LAGS)
-        cm = load_model(custom_path, compile=False)
+        _, _, _, Xf, Xl, _, scaler = process_data_custom(train_path, test_path, LAGS)
+        cm     = load_model(custom_path, compile=False)
         c_pred = scaler.inverse_transform(
             cm.predict([Xf, Xl], verbose=0).reshape(-1, 1)).reshape(1, -1)[0]
         y_preds.append(c_pred)
         names.append('CUSTOM')
-        print('CUSTOM')
+        print('\nCUSTOM:')
         eva_regress(y_test, c_pred)
-
-    plot_results(y_test, y_preds, names, site, direction)
-
-    # Average metrics across all directions, close the graph window to see output. May time few minutes.
+ 
+    if y_preds:
+        plot_results(y_test, y_preds, names, site, direction)
+        print('\nClose the graph window to see average metrics...')
+ 
     evaluate_all()
-
-
+ 
 if __name__ == '__main__':
-    main()
+    main(sys.argv)
