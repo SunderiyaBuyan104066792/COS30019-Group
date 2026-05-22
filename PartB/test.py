@@ -3,7 +3,7 @@ import math
 import warnings
 import numpy as np
 import pandas as pd
-from data.preprocessing import process_data
+from data.preprocessing import process_data, process_data_custom
 from keras.models import load_model
 import sklearn.metrics as metrics
 import matplotlib as mpl
@@ -92,7 +92,8 @@ def plot_results(y_true, y_preds, names, site, direction):
 
 def evaluate_all():
     """Evaluate all trained models and print average metrics."""
-    results = {'lstm': [], 'gru': []}
+    results = {'lstm': [], 'gru': [], 'custom': []}
+
 
     for site in os.listdir('trained_models'):
         site_path = os.path.join('trained_models', site)
@@ -110,14 +111,23 @@ def evaluate_all():
             y_test_real = scaler.inverse_transform(y_test.reshape(-1, 1)).reshape(1, -1)[0]
             X = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], 1))
 
-            for model_name in ['lstm', 'gru']:
+            for model_name in ['lstm', 'gru', 'custom']:
                 model_path = f'trained_models/{site}/{direction}/{model_name}.h5'
                 if not os.path.exists(model_path):
                     continue
 
                 model = load_model(model_path, compile=False)
-                predicted = model.predict(X, verbose=0)
-                predicted = scaler.inverse_transform(predicted.reshape(-1, 1)).reshape(1, -1)[0]
+
+                if model_name == 'custom':
+                    _, _, _, Xf, Xl, y_c, scaler= process_data_custom(train_path, test_path, LAGS)
+                    predicted = model.predict([Xf, Xl], verbose=0)
+                    y_test =scaler.inverse_transform(y_c.reshape(-1, 1)).reshape(1, -1)[0]
+                    predicted = scaler.inverse_transform(predicted.reshape(-1, 1)).reshape(1, -1)[0]
+                else:
+                    predicted = model.predict(X, verbose=0)
+                    predicted = scaler.inverse_transform(predicted.reshape(-1, 1)).reshape(1, -1)[0]
+
+
 
                 mse = metrics.mean_squared_error(y_test_real, predicted)
                 results[model_name].append({
@@ -152,7 +162,7 @@ def main():
 
     models = [
         load_model(f'trained_models/{site}/{direction}/lstm.h5', compile=False),
-        load_model(f'trained_models/{site}/{direction}/gru.h5', compile=False)
+        load_model(f'trained_models/{site}/{direction}/gru.h5', compile=False),
     ]
     names = ['LSTM', 'GRU']
 
@@ -164,6 +174,20 @@ def main():
         y_preds.append(predicted)
         print(name)
         eva_regress(y_test, predicted)
+
+
+
+    # for the custom model:
+    custom_path = f'trained_models/{site}/{direction}/custom.h5'
+    if os.path.exists(custom_path):
+        _, _, _, Xf, Xl, _, scaler= process_data_custom(train_path, test_path, LAGS)
+        cm = load_model(custom_path, compile=False)
+        c_pred = scaler.inverse_transform(
+            cm.predict([Xf, Xl], verbose=0).reshape(-1, 1)).reshape(1, -1)[0]
+        y_preds.append(c_pred)
+        names.append('CUSTOM')
+        print('CUSTOM')
+        eva_regress(y_test, c_pred)
 
     plot_results(y_test, y_preds, names, site, direction)
 
