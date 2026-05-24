@@ -4,19 +4,21 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from keras.callbacks import EarlyStopping
-from data.process_data import process_data_multi
+from data.process_data import process_data, read_data
 from lstm_model import get_lstm
 from cluster_config import get_cluster_map
 
 # Settings
 DATA_FILE = "data/Scats_Data_Oct_2006.xls"
-N_CLUSTERS = 5    # Can be changed but must match cluster_config.N_CLUSTERS
 UNITS = [12, 64, 64, 1]
 CONFIG = {
     'batch_size': 32,
     'epochs': 200,
 }
 
+def get_all_scats(file_path):
+    df = read_data(file_path)
+    return sorted(df['SCATS Number'].unique())
 
 def train_model(model, X_train, y_train, name, config):
     """
@@ -83,37 +85,28 @@ def plot_loss(hist, name):
     os.makedirs('images', exist_ok=True)
     save_path = f'images/{name}_loss.png'
     plt.savefig(save_path)
-    print(f"Loss plot saved to: {save_path}")
-    plt.show()
-    plt.pause(5)
     plt.close()
+    print(f"Loss plot saved to: {save_path}")
 
 def main():
     # 1. Build cluster map
-    cluster_map = get_cluster_map(DATA_FILE, n_clusters=N_CLUSTERS)
-    print(f"\nFound {len(cluster_map)} geographic clusters:")
-    for cid, scats_list in cluster_map.items():
-        print(f"   Cluster {cid}: {len(scats_list)} sites: {scats_list}")
+    scats_numbers = get_all_scats(DATA_FILE)
+    total = len(scats_numbers)
+    print(f"\nFound {total} SCATS sites: {scats_numbers}")
 
     # Print model structure once before the loop
     print()
     get_lstm(UNITS).summary()
     
-    total_clusters = len(cluster_map)
-    
     # 2. Train one model per cluster
-    for cluster_id, scats_list in cluster_map.items():
-        model_name = f'lstm_cluster_{cluster_id}'
-        print(f"\n{'-'*10}")
-        print(f"   Cluster {cluster_id + 1}/{total_clusters} - {model_name}")
-        print(f"   Sites: {scats_list}")
-        print(f"{'-'*10}")
+    for i, scats_id in enumerate(scats_numbers):
+        model_name = f'lstm_{scats_id}'
+        print(f"\n  Site {i+1}/{total} - SCATS {scats_id}")
         
-        # Pool data from all sites in this cluster
-        X_train, y_train, X_test, y_test, scaler = process_data_multi(
+        X_train, y_train, X_test, y_test, scaler = process_data(
             file_path=DATA_FILE,
-            scats_list=scats_list,
-            lag=4
+            lag=12,
+            scats_number=scats_id
         )
         
         # LSTM needs 3-D input: (samples, time_steps, features)
@@ -125,12 +118,10 @@ def main():
         hist = train_model(model, X_train_3d, y_train, model_name, CONFIG)
         plot_loss(hist, model_name)
         
-        print(f"\n   Cluster {cluster_id} done.")
+        print(f"\n  SCATS {scats_id} done.")
     
-    print(f"{'-'*10}")
-    print(f"\nAll {total_clusters} cluster models trained.")
+    print(f"\nAll {total} site models trained.")
     print(f"Run main_lstm.py to evaluate them.")
-    print(f"{'-'*10}")
 
 if __name__ == '__main__':
     main()
