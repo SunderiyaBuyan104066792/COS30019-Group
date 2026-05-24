@@ -13,13 +13,16 @@ from sklearn.metrics import (
     r2_score, 
     explained_variance_score
 )
-from data.process_data import process_data_multi, read_data
+from data.process_data import process_data, read_data
 from cluster_config import get_cluster_map
 
 # Settings
 DATA_FILE = 'data/Scats_Data_Oct_2006.xls'
-N_CLUSTERS = 5   # Can be changed but must match cluster_config.N_CLUSTERS
+N_CLUSTERS = 5
 
+def get_all_scats(file_path):
+    df = read_data(file_path)
+    return sorted(df['SCATS Number'].unique())
 
 def evaluate(y_true, y_pred, model_name='LSTM'):
     """
@@ -52,7 +55,6 @@ def evaluate(y_true, y_pred, model_name='LSTM'):
 def plot_predictions(y_true, y_pred, model_name='LSTM', n_points=96):
     """
     Parameters
-    ----------
     y_true     : ndarray, actual traffic values (real scale)
     y_pred     : ndarray, predicted traffic values (real scale)
     model_name : str
@@ -79,7 +81,6 @@ def plot_predictions(y_true, y_pred, model_name='LSTM', n_points=96):
     date_format = mpl.dates.DateFormatter("%H:%M")
     ax.xaxis.set_major_formatter(date_format)
     fig.autofmt_xdate()
-    
     plt.tight_layout()
     
     os.makedirs('images', exist_ok=True)
@@ -117,76 +118,107 @@ def plot_loss_from_csv(model_name='lstm'):
     plt.pause(5)
     plt.close()
 
+def plot_all_sites(all_predictions, n_points=96):
+    n = len(all_predictions)
+    fig, axes = plt.subplot(n, 1, figsize=(14, 4 * n), sharex=False)
+    
+    # If only one site, axes won't be a list - wrap it
+    if n == 1:
+        axes = [axes]
+    
+    date = '2006-10-01 00:00'
+    x = pd.date_range(date, periods=n_points, freq='15min')
+    date_format = mpl.dates.DateFormatter("%H:%M")
+    
+    for i, entry in enumerate(all_predictions):
+        ax = axes[i]
+        ax.plot(x, entry['y_true'][:n_points], label='Actual', color='steelblue')
+        ax.plot(x, entry['y_pred'][:n_points], label='Predicted',
+                linewidth=1.5, color='red')
+        
+        ax.set_title(f"SCATS {entry['scat_id']}", fontsize=11, fontweight='bold')
+        ax.set_ylabel('Vehicles / 15 min', fontsize=9)
+        ax.xaxis.set_major_formatter(date_format)
+        ax.grid(True, alpha=0.4)
+        ax.legend(fontsize=9, loc='upper left')
+    
+    axes[-1].set_xlabel('Time of Day', fontsize=10)
+    fig.suptitle('LSTM - Predicted vs Actual Traffic Flow (All Sites, 1 day)',
+                fontsize=13, fontweight='bold', y=1.002)
+    fig.autofmt_xdate()
+    plt.tight_layout()
+    
+    os.makedirs('images', exist_ok=True)
+    save_path = 'images/lstm_all_sites_predicting.png'
+    plt.savefig(save_path, bbox_inches='tight', dpi=150)
+    print(f"\nAll-sites plot saved to: {save_path}")
+    plt.pause(5)
+    plt.close()
+
 def main():
-    cluster_map = get_cluster_map(DATA_FILE, n_clusters=N_CLUSTERS)
+    scats_numbers = get_all_scats(DATA_FILE)
+    total = len(scats_numbers)
     all_metrics = []
     all_predictions = []
     
-    for cluster_id, scats_list in cluster_map.items():
-        model_name = f'lstm_cluster_{cluster_id}'
+    for i, scats_id in enumerate(scats_numbers):
+        model_name = f'lstm_{scats_id}'
         model_path = f'model/{model_name}.h5'
         
-        print(f"{'-'*10}")
-        print(f"   Cluster: {cluster_id} - {model_name}")
-        print(f"   Sites: {scats_list}")
-        print(f"{'-'*10}")
+        print(f"\n  Site {i+1}/{total} - SCATS {scats_id}")
         
         if not os.path.exists(model_path):
-            print(f"\n  Model not found at {model_path} - skipping")
+            print(f"    Model not found at {model_path} - skipping")
             continue
         
-        # 1. Reconstruct test data (same settings as training)
-        _, _, X_test, y_test, scaler = process_data_multi(
+        # 1. Reconstruct test data
+        _, _, X_test, y_test, scaler = process_data(
             file_path=DATA_FILE,
-            scats_list=scats_list,
-            lag=4
+            lag=12,
+            scats_number=scats_id
         )
-        
-        # 2. Load model (compile=False avoids legacy .h5 deserialization bug)
-        model= load_model(model_path, compile=False)
+        # 2. Load model
+        model = load_model(model_path, compile=False)
         model.compile(loss='mse', optimizer='adam')
-        print(f"\n  Model loaded from {model_path}")
+        print(f"    Model loaded from {model_path}")
         
-        # 3. Reshape for LSTM and predict
+        # 3. Reshape and predict
         X_test_3d = X_test.reshape(X_test.shape[0], X_test.shape[1], 1)
-        
-        y_true_scaled = y_test
         y_pred_scaled = model.predict(X_test_3d)
         
-        # 4. Inverse-transform to real vehicle count
-        y_true = scaler.inverse_transform(y_true_scaled.reshape(-1, 1)).flatten()
+        # 4. Inverse-transform to real vehicle counts
+        y_true = scaler.inverse_transform(y_test.reshape(-1, 1)).flatten()
         y_pred = scaler.inverse_transform(y_pred_scaled.reshape(-1, 1)).flatten()
         
-        # Store for summary plot
-        all_predictions.append({        
-            'cluster_id': cluster_id,
+        # 5. Store dor summary plot
+        all_predictions.append({
+            'scats_id': scats_id,
             'y_true': y_true,
             'y_pred': y_pred,
         })
         
-        # 5. Evaluate
+        # 6. Evaluate
         metrics = evaluate(y_true, y_pred, model_name=model_name)
-        metrics['cluster_id'] = cluster_id
-        metrics['n_sites'] = len(scats_list)
-        metrics['scats_sites'] = str(scats_list)
+        metrics['scats_id'] = scats_id
         all_metrics.append(metrics)
         
-        # 6. Plots
+        # 7. Per-site plots
         plot_predictions(y_true, y_pred, model_name=model_name)
         plot_loss_from_csv(model_name)
     
-    # Summary
+    if all_predictions:
+        plot_all_sites(all_predictions)
+    
+    # Summary table:
     if all_metrics:
-        print(f"\n{'-'*10}")
-        print("Summary: All Clusters Models")
-        print(f"{'-'*10}")
-        df_summary = pd.DataFrame(all_metrics).set_index('cluster_id')
-        print(df_summary[['n_sites', 'MAE', 'RMSE', 'MAPE', 'R2', 'EVS']].to_string())
+        print("Summary: All SCATS Sites")
+        df_summary = pd.DataFrame(all_metrics).set_index('scats_id')
+        print(df_summary[['MAE', 'RMSE', 'R2', 'EVS']]).to_string()
         
         os.makedirs('model', exist_ok=True)
-        out_path = 'model/lstm_cluster_metrics.csv'
+        out_path = 'model/lstm_all_site_metrics.csv'
         df_summary.to_csv(out_path)
-        print(f"\nSummary saved to {out_path}")
-
+        print(f"\nSummary saved to: {out_path}")
+        
 if __name__ == '__main__':
     main()
