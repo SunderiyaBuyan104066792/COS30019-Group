@@ -20,10 +20,16 @@ Please follow these steps to set up everything
 
     The testing needs to be worked further. 
 
-5. Graph/Edges/Time calculations
+5. Predictions: 
+    All model predictions for 2006 October timeframe is now saved as a csv file under predictions/ folder. 
+    To get this please run the "python predict_save.py" it may take some time.
+
+6. Graph/Edges/Time calculations
     5.1 Go to the graph folder
     5.2 Upload the "SCATSSiteListingSpreadsheet_VicRoads.xls" like this: "site_road_data/SCATSSiteListingSpreadsheet_VicRoads.xls
     5.3 Run "python parse_road_data.py" to get the data needed for graph
     5.4 Run "python parse_site_types.py" to check whether the SCATS are intersections(ALL were INT). 
+    5.5 Traveltime: traveltime.py handles the speed and time conversions
+    5.6 Loading Predictions: load_predictions.py returns the predictions from models for the scat directions at certain time of the day. 
 
 

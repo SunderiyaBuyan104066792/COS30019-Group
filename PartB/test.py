@@ -12,9 +12,6 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 warnings.filterwarnings("ignore")
 
-LAGS = 4
-
-
 def MAPE(y_true, y_pred):
     """Mean Absolute Percentage Error
     Filters out zero values to avoid division by zero.
@@ -108,7 +105,7 @@ def evaluate_all():
             if not os.path.exists(train_path):
                 continue
 
-            _, _, _, Xf, Xl, y_c, scaler = process_data(train_path, test_path, LAGS)
+            _, _, _, Xf, Xl, y_c, scaler = process_data(train_path, test_path, 4)
             y_eval = scaler.inverse_transform(y_c.reshape(-1, 1)).reshape(1, -1)[0]
 
             for model_name in ['lstm', 'gru', 'custom']:
@@ -137,7 +134,7 @@ def evaluate_all():
         print(f' MAE:{df["mae"].mean():.4f}')
         print(f' RMSE: {df["rmse"].mean():.4f}')
         print(f' MAPE: {df["mape"].mean():.4f}%')
-        print(f'R2:   {df["r2"].mean():.4f}')
+        print(f'R2: {df["r2"].mean():.4f}')
 
 
 def pick_direction(site):
@@ -154,7 +151,7 @@ def pick_direction(site):
 
     print(f'\nAvailable directions for site {site}:')
     for i, d in enumerate(directions, 1):
-        print(f'  {i}. {d}')
+        print(f'{i}. {d}')
 
     while True:
         try:
@@ -190,13 +187,13 @@ def main(argv):
     direction = pick_direction(site)
 
     train_path = f'data/SCATS_Data/{site}/{direction}/train.csv'
-    test_path  = f'data/SCATS_Data/{site}/{direction}/test.csv'
+    test_path = f'data/SCATS_Data/{site}/{direction}/test.csv'
 
-    _, _, _, Xf, Xl, y_c, scaler = process_data(train_path, test_path, LAGS)
+    _, _, _, Xf, Xl, y_c, scaler = process_data(train_path, test_path, 4)
     y_test = scaler.inverse_transform(y_c.reshape(-1, 1)).reshape(1, -1)[0]
 
     y_preds = []
-    names   = []
+    names = []
 
     for model_name in ['lstm', 'gru', 'custom']:
         model_path = f'trained_models/{site}/{direction}/{model_name}.h5'
