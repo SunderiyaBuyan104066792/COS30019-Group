@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import pandas as pd
-from data.preprocessing import process_data, process_data_custom
+from data.preprocessing import process_data
 from models import get_lstm, get_gru, get_custom
 from keras.callbacks import EarlyStopping
 
@@ -50,19 +50,16 @@ def train_all(model_name, test_run=False):
             if not os.path.exists(train_path):
                 continue
 
-            if model_name == 'custom':
-                # requires two inputs (time features and lag window (others do that automatically))
-                Xf, Xl, y_train, _, _, _, _ = process_data_custom(train_path, test_path, 4)
-                m = get_custom(4)
-                X_train = [Xf, Xl]
-            else:
-                X_train, y_train, _, _, _ = process_data(train_path, test_path, 4)
-                X_train = np.reshape(X_train, (X_train.shape[0], X_train.shape[1], 1))
+            # all models take [features, lags] dual input
+            Xf, Xl, y_train, _, _, _, _ = process_data(train_path, test_path, 4)
+            X_train = [Xf, Xl]
 
-                if model_name == 'lstm':
-                    m = get_lstm([4, 64, 64, 1])
-                elif model_name == 'gru':
-                    m = get_gru([4, 64, 64, 1])
+            if model_name == 'lstm':
+                m = get_lstm(4)
+            elif model_name == 'gru':
+                m = get_gru(4)
+            elif model_name == 'custom':
+                m = get_custom(4)
 
             save_path = os.path.join('trained_models', site, direction, model_name)
             train_model(m, X_train, y_train, save_path, config)

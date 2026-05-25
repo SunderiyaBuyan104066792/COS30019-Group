@@ -5,7 +5,7 @@ import warnings
 import argparse
 import numpy as np
 import pandas as pd
-from data.preprocessing import process_data, process_data_custom
+from data.preprocessing import process_data
 from keras.models import load_model
 import sklearn.metrics as metrics
 import matplotlib as mpl
@@ -96,7 +96,6 @@ def evaluate_all():
     """Evaluate all trained models and print average metrics."""
     results = {'lstm': [], 'gru': [], 'custom': []}
 
-
     for site in os.listdir('trained_models'):
         site_path = os.path.join('trained_models', site)
         if not os.path.isdir(site_path):
@@ -109,9 +108,8 @@ def evaluate_all():
             if not os.path.exists(train_path):
                 continue
 
-            _, _, X_test, y_test, scaler = process_data(train_path, test_path, LAGS)
-            y_test_real = scaler.inverse_transform(y_test.reshape(-1, 1)).reshape(1, -1)[0]
-            X = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], 1))
+            _, _, _, Xf, Xl, y_c, scaler = process_data(train_path, test_path, LAGS)
+            y_eval = scaler.inverse_transform(y_c.reshape(-1, 1)).reshape(1, -1)[0]
 
             for model_name in ['lstm', 'gru', 'custom']:
                 model_path = f'trained_models/{site}/{direction}/{model_name}.h5'
@@ -119,24 +117,15 @@ def evaluate_all():
                     continue
 
                 model = load_model(model_path, compile=False)
+                predicted = model.predict([Xf, Xl], verbose=0)
+                predicted = scaler.inverse_transform(predicted.reshape(-1, 1)).reshape(1, -1)[0]
 
-                if model_name == 'custom':
-                    _, _, _, Xf, Xl, y_c, scaler= process_data_custom(train_path, test_path, LAGS)
-                    predicted = model.predict([Xf, Xl], verbose=0)
-                    y_test =scaler.inverse_transform(y_c.reshape(-1, 1)).reshape(1, -1)[0]
-                    predicted = scaler.inverse_transform(predicted.reshape(-1, 1)).reshape(1, -1)[0]
-                else:
-                    predicted = model.predict(X, verbose=0)
-                    predicted = scaler.inverse_transform(predicted.reshape(-1, 1)).reshape(1, -1)[0]
-
-
-
-                mse = metrics.mean_squared_error(y_test_real, predicted)
+                mse = metrics.mean_squared_error(y_eval, predicted)
                 results[model_name].append({
-                    'mae': metrics.mean_absolute_error(y_test_real, predicted),
+                    'mae': metrics.mean_absolute_error(y_eval, predicted),
                     'rmse': math.sqrt(mse),
-                    'mape': MAPE(y_test_real, predicted),
-                    'r2': metrics.r2_score(y_test_real, predicted),
+                    'mape': MAPE(y_eval, predicted),
+                    'r2': metrics.r2_score(y_eval, predicted),
                 })
 
     print('\n=== Average metrics across all directions ===')
@@ -158,15 +147,15 @@ def pick_direction(site):
         d for d in os.listdir(site_path)
         if os.path.isdir(os.path.join(site_path, d))
     ])
- 
+
     if not directions:
         print(f'No directions found for site {site}.')
         sys.exit(1)
- 
+
     print(f'\nAvailable directions for site {site}:')
     for i, d in enumerate(directions, 1):
         print(f'  {i}. {d}')
- 
+
     while True:
         try:
             choice = int(input('\nEnter number: '))
@@ -175,8 +164,8 @@ def pick_direction(site):
             print(f'Please choose a number between 1 and {len(directions)}.')
         except ValueError:
             print('Invalid input, choose from above options')
- 
- 
+
+
 def main(argv):
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -198,51 +187,36 @@ def main(argv):
             except ValueError:
                 print('Invalid input, enter a number.')
 
-    # Interactive direction selection
-    direction  = pick_direction(site)
+    direction = pick_direction(site)
 
     train_path = f'data/SCATS_Data/{site}/{direction}/train.csv'
-    test_path = f'data/SCATS_Data/{site}/{direction}/test.csv'
- 
-    _, _, X_test, y_test, scaler = process_data(train_path, test_path, LAGS)
-    y_test = scaler.inverse_transform(y_test.reshape(-1, 1)).reshape(1, -1)[0]
- 
+    test_path  = f'data/SCATS_Data/{site}/{direction}/test.csv'
+
+    _, _, _, Xf, Xl, y_c, scaler = process_data(train_path, test_path, LAGS)
+    y_test = scaler.inverse_transform(y_c.reshape(-1, 1)).reshape(1, -1)[0]
+
     y_preds = []
     names   = []
- 
-    # LSTM and GRU
-    for model_name in ['lstm', 'gru']:
+
+    for model_name in ['lstm', 'gru', 'custom']:
         model_path = f'trained_models/{site}/{direction}/{model_name}.h5'
         if not os.path.exists(model_path):
             print(f'\n{model_name.upper()}: model not found, skipping.')
             continue
- 
+
         model     = load_model(model_path, compile=False)
-        X         = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], 1))
-        predicted = model.predict(X, verbose=0)
-        predicted = scaler.inverse_transform(predicted.reshape(-1, 1)).reshape(1, -1)[0]
+        predicted = scaler.inverse_transform(
+            model.predict([Xf, Xl], verbose=0).reshape(-1, 1)).reshape(1, -1)[0]
         y_preds.append(predicted)
         names.append(model_name.upper())
         print(f'\n{model_name.upper()}:')
         eva_regress(y_test, predicted)
- 
-    # Custom model — uses two inputs [Xf, Xl]
-    custom_path = f'trained_models/{site}/{direction}/custom.h5'
-    if os.path.exists(custom_path):
-        _, _, _, Xf, Xl, _, scaler = process_data_custom(train_path, test_path, LAGS)
-        cm     = load_model(custom_path, compile=False)
-        c_pred = scaler.inverse_transform(
-            cm.predict([Xf, Xl], verbose=0).reshape(-1, 1)).reshape(1, -1)[0]
-        y_preds.append(c_pred)
-        names.append('CUSTOM')
-        print('\nCUSTOM:')
-        eva_regress(y_test, c_pred)
- 
+
     if y_preds:
         plot_results(y_test, y_preds, names, site, direction)
         print('\nClose the graph window to see average metrics...')
- 
+
     evaluate_all()
- 
+
 if __name__ == '__main__':
     main(sys.argv)
