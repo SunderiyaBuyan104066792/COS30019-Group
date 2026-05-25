@@ -1,35 +1,85 @@
-Please follow these steps to set up everything
+# Part B — Traffic Flow Prediction (TBRGS)
 
-1. Preparing the datasets:
-    From to PartB/data directory on your terminal:
-        1.1 Upload the "Scats Data October 2006.xls" in the data folder
-        1.2 Run python process_df.py
-        Will output you the SCATS_Data containing all required train/test sets 
+Traffic-based route guidance using LSTM and GRU models trained on SCATS October 2006 data.
 
-2. Getting all the trained models:
-    The models were traind by "train.py" using the SCATS_Data and "model.py"
-    2.1 Download the zipped file "trained_models" and save and unzip it within the PartB directory. 
+---
+## Setup
 
-3. Adding the custom model: 
-    1. If you need a different preprocessing, training etc create a separate file for it. We can combine it later.
+### 1. Install dependencies
 
-4. Testing the models will take few minutes:
-    4.1 Go to the PartB directory
-    4.2 Currenty you can test individual direction for sites by defining the site number and direction on the "main()" It will give you the metrics and the graph. 
-    4.3 Additionally, I have added evaluate all that gives the average metrics for both models. Just close the graph window and wait for a minute for this. Ignore the warnings. 
+```bash
+pip install -r requirements.txt
+```
 
-    The testing needs to be worked further. 
+### 2. Prepare the datasets
 
-5. Predictions: 
-    All model predictions for 2006 October timeframe is now saved as a csv file under predictions/ folder. 
-    To get this please run the "python predict_save.py" it may take some time.
+Navigate to the `data/` directory and run the processing script:
 
-6. Graph/Edges/Time calculations
-    5.1 Go to the graph folder
-    5.2 Upload the "SCATSSiteListingSpreadsheet_VicRoads.xls" like this: "site_road_data/SCATSSiteListingSpreadsheet_VicRoads.xls
-    5.3 Run "python parse_road_data.py" to get the data needed for graph
-    5.4 Run "python parse_site_types.py" to check whether the SCATS are intersections(ALL were INT). 
-    5.5 Traveltime: traveltime.py handles the speed and time conversions
-    5.6 Loading Predictions: load_predictions.py returns the predictions from models for the scat directions at certain time of the day. 
+> This reads `Scats Data October 2006.xls` and outputs the `SCATS_Data/` folder containing all required train/test splits.
+>Upload the `Scats Data October 2006.xls` in the data folder.
 
+```bash
+cd PartB/data
+python process_df.py
+```
+
+### 3. Download trained models
+
+Download the zipped `trained_models` file, place it in the `PartB/` directory, and unzip it:
+
+```bash
+# From PartB/
+unzip trained_models.zip
+```
+
+> The models were trained using `train.py` with `SCATS_Data` and `trained_models/model.py`.
+
+---
+
+## Usage
+
+### Training
+
+```bash
+cd PartB
+python train.py
+```
+
+### Testing
+
+```bash
+cd PartB
+python test.py
+```
+
+- Tests an individual SCATS site and direction — configure the site number and direction inside `main()`.
+- Outputs evaluation metrics and a plot.
+- `evaluate_all()` computes average metrics across both models. Close the graph window and wait for few minutes. Warnings can be ignored.
+
+### Saving Predictions
+
+```bash
+cd PartB
+python predict_save.py
+```
+
+> Computes and saves predictions for the entire October 2006 timeframe and saves them as CSV files under `predictions/`. This may take a few minutes.
+
+---
+
+## Graph & Travel Time
+
+> **Note:** The `SCATSSiteListingSpreadsheet_VicRoads.xls` must be placed at `graph/site_road_data/SCATSSiteListingSpreadsheet_VicRoads.xls` before running the parse scripts.
+
+```bash
+cd PartB/graph
+python parse_road_data.py     # Parses VicRoads 
+python parse_site_type.py     # Confirms all SCATS sites are intersections (INT)
+```
+
+| Module | Description |
+|---|---|
+| `graph.py` | Builds the road network graph from nodes and edges |
+| `traveltime.py` | Converts traffic volume to speed and calculates travel time |
+| `load_prediction.py` | Returns model predictions for a given SCAT and time of day |
 
