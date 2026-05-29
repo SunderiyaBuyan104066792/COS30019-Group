@@ -11,8 +11,8 @@ class Graph:
         self.edges = []
 
     def build(self):
-        self._load_nodes()
-        self._build_edges()
+        self.load_nodes()
+        self.build_edges()
 
     def load_nodes(self):
         meta = pd.read_csv('graph/site_road_data/road_data.csv')
@@ -32,7 +32,7 @@ class Graph:
                 a, b = sites[i], sites[j]
                 shared = a.roads & b.roads
                 if shared:
-                    dist = self._haversine(a.lat, a.lon, b.lat, b.lon)
+                    dist = self.haversine(a.lat, a.lon, b.lat, b.lon)
                     road = list(shared)[0]
                     self.edges.append(Edge(a, b, road, dist))
                     self.edges.append(Edge(b, a, road, dist))
