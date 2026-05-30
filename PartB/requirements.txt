@@ -1,6 +1,11 @@
-numpy==2.1.0
+numpy==1.26.4
 pandas==2.2.2
 scikit-learn==1.5.2
 matplotlib==3.9.2
-tensorflow==2.20.0
-keras==3.13.2
+tensorflow==2.16.2
+keras==3.3.3
+tkintermapview==1.29
+openpyxl
+python-calamine
+requests
+
