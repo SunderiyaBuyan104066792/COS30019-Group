@@ -5,7 +5,7 @@ from data.preprocessing import process_data
 from models import get_lstm, get_gru, get_custom
 from keras.callbacks import EarlyStopping
 
-
+LAGS = 8
 def train_model(model, X_train, y_train, name, config):
     """Train a single model.
 
@@ -50,23 +50,22 @@ def train_all(model_name, test_run=False):
             if not os.path.exists(train_path):
                 continue
 
-            # all models take [features, lags] dual input
-            Xf, Xl, y_train, _, _, _, _ = process_data(train_path, test_path, 4)
+            Xf, Xl, y_train, _, _, _, _ = process_data(train_path, test_path, LAGS)
             X_train = [Xf, Xl]
 
             if model_name == 'lstm':
-                m = get_lstm(4)
+                m = get_lstm(LAGS)
             elif model_name == 'gru':
-                m = get_gru(4)
+                m = get_gru(LAGS)
             elif model_name == 'custom':
-                m = get_custom(4)
+                m = get_custom(LAGS)
 
             save_path = os.path.join('trained_models', site, direction, model_name)
             train_model(m, X_train, y_train, save_path, config)
             print(f'Trained {model_name} | {site} | {direction}')
 
         if test_run:
-            print('Test run complete for the test site')
+            print('Test run complete')
             break
 
 

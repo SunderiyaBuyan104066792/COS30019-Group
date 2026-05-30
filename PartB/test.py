@@ -12,6 +12,9 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 warnings.filterwarnings("ignore")
 
+LAGS = 8
+
+
 def MAPE(y_true, y_pred):
     """Mean Absolute Percentage Error
     Filters out zero values to avoid division by zero.
@@ -64,14 +67,13 @@ def plot_results(y_true, y_preds, names, site, direction):
         site: String, SCATS site number.
         direction: String, direction name.
     """
-    # One day = 96 intervals of 15 minutes
     d = '2006-10-25 00:00'
     x = pd.date_range(d, periods=96, freq='15min')
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
 
-    ax.plot(x, y_true[:96], label='True Data')
+    ax.plot(x, y_true[:96], label='True Data', linewidth=2, color='black')
     for name, y_pred in zip(names, y_preds):
         ax.plot(x, y_pred[:96], label=name)
 
@@ -100,12 +102,12 @@ def evaluate_all():
 
         for direction in os.listdir(site_path):
             train_path = f'data/SCATS_Data/{site}/{direction}/train.csv'
-            test_path = f'data/SCATS_Data/{site}/{direction}/test.csv'
+            test_path  = f'data/SCATS_Data/{site}/{direction}/test.csv'
 
             if not os.path.exists(train_path):
                 continue
 
-            _, _, _, Xf, Xl, y_c, scaler = process_data(train_path, test_path, 4)
+            _, _, _, Xf, Xl, y_c, scaler = process_data(train_path, test_path, LAGS)
             y_eval = scaler.inverse_transform(y_c.reshape(-1, 1)).reshape(1, -1)[0]
 
             for model_name in ['lstm', 'gru', 'custom']:
@@ -113,16 +115,17 @@ def evaluate_all():
                 if not os.path.exists(model_path):
                     continue
 
-                model = load_model(model_path, compile=False)
-                predicted = model.predict([Xf, Xl], verbose=0)
-                predicted = scaler.inverse_transform(predicted.reshape(-1, 1)).reshape(1, -1)[0]
+                model     = load_model(model_path, compile=False)
+                predicted = scaler.inverse_transform(
+                    model.predict([Xf, Xl], verbose=0).reshape(-1, 1)
+                ).reshape(1, -1)[0]
 
                 mse = metrics.mean_squared_error(y_eval, predicted)
                 results[model_name].append({
-                    'mae': metrics.mean_absolute_error(y_eval, predicted),
+                    'mae':  metrics.mean_absolute_error(y_eval, predicted),
                     'rmse': math.sqrt(mse),
                     'mape': MAPE(y_eval, predicted),
-                    'r2': metrics.r2_score(y_eval, predicted),
+                    'r2':   metrics.r2_score(y_eval, predicted),
                 })
 
     print('\n=== Average metrics across all directions ===')
@@ -131,10 +134,10 @@ def evaluate_all():
             continue
         df = pd.DataFrame(res)
         print(f'\n{model_name.upper()} ({len(res)} directions):')
-        print(f' MAE:{df["mae"].mean():.4f}')
-        print(f' RMSE: {df["rmse"].mean():.4f}')
-        print(f' MAPE: {df["mape"].mean():.4f}%')
-        print(f'R2: {df["r2"].mean():.4f}')
+        print(f'  MAE:  {df["mae"].mean():.4f}')
+        print(f'  RMSE: {df["rmse"].mean():.4f}')
+        print(f'  MAPE: {df["mape"].mean():.4f}%')
+        print(f'  R²:   {df["r2"].mean():.4f}')
 
 
 def pick_direction(site):
@@ -187,13 +190,13 @@ def main(argv):
     direction = pick_direction(site)
 
     train_path = f'data/SCATS_Data/{site}/{direction}/train.csv'
-    test_path = f'data/SCATS_Data/{site}/{direction}/test.csv'
+    test_path  = f'data/SCATS_Data/{site}/{direction}/test.csv'
 
-    _, _, _, Xf, Xl, y_c, scaler = process_data(train_path, test_path, 4)
+    _, _, _, Xf, Xl, y_c, scaler = process_data(train_path, test_path, LAGS)
     y_test = scaler.inverse_transform(y_c.reshape(-1, 1)).reshape(1, -1)[0]
 
     y_preds = []
-    names = []
+    names   = []
 
     for model_name in ['lstm', 'gru', 'custom']:
         model_path = f'trained_models/{site}/{direction}/{model_name}.h5'
@@ -203,7 +206,9 @@ def main(argv):
 
         model     = load_model(model_path, compile=False)
         predicted = scaler.inverse_transform(
-            model.predict([Xf, Xl], verbose=0).reshape(-1, 1)).reshape(1, -1)[0]
+            model.predict([Xf, Xl], verbose=0).reshape(-1, 1)
+        ).reshape(1, -1)[0]
+
         y_preds.append(predicted)
         names.append(model_name.upper())
         print(f'\n{model_name.upper()}:')
@@ -214,6 +219,7 @@ def main(argv):
         print('\nClose the graph window to see average metrics...')
 
     evaluate_all()
+
 
 if __name__ == '__main__':
     main(sys.argv)

@@ -68,7 +68,7 @@ def get_custom(n_lags):
     input_lags = Input(shape=(n_lags, 1))
 
     # 2 filters(changed to 64), kernel size 3 (size of scope), padding is same
-    x = Conv1D(64, kernel_size=3, padding='same', activation='relu')(input_lags)
+    x = Conv1D(32, kernel_size=3, padding='same', activation='relu')(input_lags)
 
     # 15% dropout
     x = Dropout(0.15)(x)
