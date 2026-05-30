@@ -556,7 +556,7 @@ if __name__ == '__main__':
     slot = time_to_slot(hour, minute)
     
     for model_type in ['lstm', 'gru', 'dff']:
-        print(f"\n{model_type.upper()} (slot {slot} = {hour}:{minute:02d})")
+        print(f"\n{model_type.upper()} (V{slot} = {hour}:{minute:02d})")
         dyn = build_dynamic_edges(edges, predictor, model_type=model_type, time_slot=slot)
         paths = top_k_paths(nodes, dyn, origin, destination, k=5)
         if not paths:
