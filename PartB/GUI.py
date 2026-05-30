@@ -339,8 +339,8 @@ class PathfinderApp:
         self.no_path_entry = tk.Entry(sidebar, width=28)
         self.no_path_entry.pack(padx=12, pady=2)
         
-        btn = tk.Button(sidebar, text="Print selected", width=22, fg="#228B22",command=self.submit)
-        btn.pack()
+        btn = tk.Button(sidebar, text="Find Path", width=22, fg="#228B22", command=self.submit)
+        btn.pack(padx=12, pady=(15, 10))
         
 
 
