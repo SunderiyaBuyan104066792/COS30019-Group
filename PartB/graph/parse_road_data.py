@@ -21,7 +21,7 @@ def build_metadata():
     roads.columns = ['scats_num', 'roads']
 
     metadata = coords.merge(roads, on='scats_num')
-    metadata.to_csv('site_road_data/road_data.csv', index=False)
+    metadata.to_csv('../data/site_road_data/road_data.csv', index=False)
     print(f'Saved road_data.csv ({len(metadata)} sites)')
     print(metadata.head(3).to_string())
 
