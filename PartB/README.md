@@ -13,30 +13,44 @@ pip install -r requirements.txt
 
 ### 2. Prepare the datasets
 
-Navigate to the `data/` directory and run the processing script:
-
-> This reads `Scats Data October 2006.xls` and outputs the `SCATS_Data/` folder containing all required train/test splits.
->Upload the `Scats Data October 2006.xls` in the data folder.
+Place `Scats Data October 2006.xls` in the `data/` directory, then run:
 
 ```bash
 cd PartB/data
 python process_df.py
 ```
 
+This reads the XLS and outputs per-direction `train.csv` / `test.csv` splits under `data/SCATS_Data/`.
+
 ### 3. Download trained models
 
 Download the zipped `trained_models` file, place it in the `PartB/` directory, and unzip it:
 
 ```bash
-# From PartB/
 unzip trained_models.zip
 ```
 
-> The models were trained using `train.py` with `SCATS_Data` and `trained_models/model.py`.
-
 ---
 
-## Usage
+## Running
+
+### Route Visualiser (GUI)
+
+```bash
+cd PartB
+python visualiser.py
+```
+
+Select origin, destination, departure time, algorithm, and model from the dropdowns then click **Find Routes**. Routes are drawn on the network canvas and listed by travel time (best to worst). Click a route in the list to highlight it.
+
+### Command-line routing
+
+```bash
+cd PartB
+python pathFinder.py
+```
+
+Prints the top-5 routes for the hardcoded origin/destination in `main()`. Edit that function to change parameters.
 
 ### Training
 
@@ -52,34 +66,53 @@ cd PartB
 python test.py
 ```
 
-- Tests an individual SCATS site and direction — configure the site number and direction inside `main()`.
-- Outputs evaluation metrics and a plot.
-- `evaluate_all()` computes average metrics across both models. Close the graph window and wait for few minutes. Warnings can be ignored.
-
-### Saving Predictions
-
-```bash
-cd PartB
-python predict_save.py
-```
-
-> Computes and saves predictions for the entire October 2006 timeframe and saves them as CSV files under `predictions/`. This may take a few minutes.
+Evaluates a single SCATS site and direction, prints metrics (MAE, RMSE, MAPE, R²), and shows a prediction plot. `evaluate_all()` computes averages across all trained directions.
 
 ---
 
-## Graph & Travel Time
+## Search Algorithms
 
-> **Note:** The `SCATSSiteListingSpreadsheet_VicRoads.xls` must be placed at `graph/site_road_data/SCATSSiteListingSpreadsheet_VicRoads.xls` before running the parse scripts.
+All algorithms are in `pathFinder.py` and accept the same interface. Pass via the `method` parameter of `find_routes()`.
+
+| Key | Algorithm |
+|-----|-----------|
+| `AS` | A* (default) |
+| `BFS` | Breadth-First Search |
+| `DFS` | Depth-First Search |
+| `GBFS` | Greedy Best-First Search |
+| `DLS` | Depth-Limited Search (CUS1) |
+| `ALT` | A* with Landmark Triangle Inequality (CUS2) |
+
+Routes are found using Top k shortest paths with the selected algorithm. Each edge's travel time is predicted at the actual arrival time at that node.
+
+---
+
+## Modules
+
+| File | Description |
+|------|-------------|
+| `pathFinder.py` | Search algorithms, Yen's k-shortest, `find_routes()` API |
+| `visualiser.py` | Tkinter GUI — network canvas and route highlighting |
+| `predict.py` | ML inference — predicts traffic flow for a SCATS site and November datetime |
+| `models.py` | Keras model definitions (LSTM, GRU, custom CNN-RNN) |
+| `train.py` | Training script |
+| `test.py` | Evaluation and plotting |
+| `graph/graph.py` | Builds the road network from `road_data.csv` |
+| `graph/traveltime.py` | Converts predicted flow to speed and travel time (seconds) |
+| `graph/search_node.py` | `SearchNode` used during pathfinding; `build_path()` to trace routes |
+| `graph/node.py` | Physical `Node` — SCATS number, coordinates, road names |
+| `graph/edge.py` | `Edge` between two nodes — road name and distance (km) |
+| `graph/parse_road_data.py` | Regenerates `road_data.csv` from the VicRoads XLS |
+| `data/process_df.py` | Preprocesses SCATS XLS into per-direction train/test CSVs |
+
+---
+
+## Graph regeneration (optional)
+
+Only needed if `road_data.csv` needs to be rebuilt from scratch. Requires `SCATSSiteListingSpreadsheet_VicRoads.xls` placed at `graph/site_road_data/`.
 
 ```bash
 cd PartB/graph
-python parse_road_data.py     # Parses VicRoads 
-python parse_site_type.py     # Confirms all SCATS sites are intersections (INT)
+python parse_road_data.py
+python parse_site_type.py
 ```
-
-| Module | Description |
-|---|---|
-| `graph.py` | Builds the road network graph from nodes and edges |
-| `traveltime.py` | Converts traffic volume to speed and calculates travel time |
-| `load_prediction.py` | Returns model predictions for a given SCAT and time of day |
-
