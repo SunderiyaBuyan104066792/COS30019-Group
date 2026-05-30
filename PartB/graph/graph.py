@@ -1,7 +1,12 @@
 import math
+import sys
 import pandas as pd
-from .node import Node
-from .edge import Edge
+
+sys.path.insert(0, 'graph')
+from node import Node
+from edge import Edge
+
+_CSV = 'graph/site_road_data/road_data.csv'
 
 
 class Graph:
@@ -15,14 +20,14 @@ class Graph:
         self.build_edges()
 
     def load_nodes(self):
-        meta = pd.read_csv('graph/site_road_data/road_data.csv')
+        meta = pd.read_csv(_CSV)
         for _, row in meta.iterrows():
             roads = set(row['roads'].split('|')) if pd.notna(row['roads']) else set()
             self.nodes[int(row['scats_num'])] = Node(
-                scats_num = int(row['scats_num']),
-                lat = row['latitude'],
-                lon  = row['longitude'],
-                roads = roads
+                scats_num=int(row['scats_num']),
+                lat=row['latitude'],
+                lon=row['longitude'],
+                roads=roads
             )
 
     def build_edges(self):
@@ -44,23 +49,19 @@ class Graph:
         return self.nodes.get(scats_num)
 
     @staticmethod
-    def haversine(lat1, lon1, lat2, lon2): #Distance in km between two lat/lon points.
-        R  = 6371
+    def haversine(lat1, lon1, lat2, lon2):
+        R = 6371
         dlat = math.radians(lat2 - lat1)
         dlon = math.radians(lon2 - lon1)
         a = (math.sin(dlat / 2) ** 2
-                + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2)
+             + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2)
         return round(R * 2 * math.asin(math.sqrt(a)), 4)
 
     def __repr__(self):
         return f'Graph({len(self.nodes)} nodes, {len(self.edges)} edges)'
 
 
-def main():
+if __name__ == '__main__':
     g = Graph()
     g.build()
     print(g)
-    print()
-
-if __name__ == '__main__':
-    main()
