@@ -50,8 +50,12 @@ class TrafficPredictor:
     def _get_lag_window(self, scats_id, time_slot):
         # Return the 'lag' most-recent flow values ending at time_slot
         flow = self._get_flow_series(scats_id)
-        end_idx = time_slot if time_slot > 0 else len(flow)
-        window = flow[max(0, end_idx - self.lag):end_idx]
+        indices = [time_slot + (day * 96) for day in range(len(flow) // 96)]
+        valid   = [i for i in indices if i < len(flow)]
+        if not valid:
+            return np.zeros(self.lag)
+        end_idx = valid[-1]   # use the most recent day
+        window  = flow[max(0, end_idx - self.lag):end_idx]
         if len(window) < self.lag:
             window = np.concatenate([np.zeros(self.lag - len(window)), window])
         return window.astype(float)
@@ -555,9 +559,13 @@ if __name__ == '__main__':
         print(f"\n{model_type.upper()} (slot {slot} = {hour}:{minute:02d})")
         dyn = build_dynamic_edges(edges, predictor, model_type=model_type, time_slot=slot)
         paths = top_k_paths(nodes, dyn, origin, destination, k=5)
-        save_path_to_txt(paths, sites, output_file=f'result_{model_type}.txt')
         if not paths:
             print("  No path found.")
         else: 
             for line in format_paths(paths, sites):
                 print(' ', line)
+                save_path_to_txt(paths, sites, output_file=f'result_{model_type}.txt')
+
+
+
+
