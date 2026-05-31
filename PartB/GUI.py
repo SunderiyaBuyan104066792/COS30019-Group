@@ -288,8 +288,26 @@ class PathfinderApp:
         selected_model = self.chosen_model.get().strip()
         selected_algo = self.chosen_algorithmn.get().strip()
 
-        if not all([Loc_Start, Loc_End, selected_model, selected_algo]):
-            self.show_error("Missing or invalid Start, End, Model or Algorithmn")
+        # check each field individually so the error message tells the user exactly what is missing
+        if not Loc_Start:
+            if self.start_search_var.get().strip():
+                # user typed something but never clicked a result - likely a typo or invalid node
+                self.show_error("Starting Location not recognised. Check your spelling or pick a result from the list.")
+            else:
+                self.show_error("Please enter and select a Starting Location.")
+            return
+        if not Loc_End:
+            if self.end_search_var.get().strip():
+                # user typed something but never clicked a result - likely a typo or invalid node
+                self.show_error("End Location not recognised. Check your spelling or pick a result from the list.")
+            else:
+                self.show_error("Please enter and select an End Location.")
+            return
+        if not selected_model:
+            self.show_error("Please select a Model.")
+            return
+        if not selected_algo:
+            self.show_error("Please select a Search Algorithm.")
             return
 
         # spinboxes enforce the range so we just need to read the values
