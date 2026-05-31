@@ -9,7 +9,6 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from pathFinder import find_routes
 from graph.graph import Graph
 
 CANVAS_W = 760
@@ -225,6 +224,7 @@ class VisApp(tk.Tk):
 
         def run():
             try:
+                from pathFinder import find_routes
                 routes = find_routes(origin, dest, depart,
                                      model_name=model, method=method, k=k)
                 self.after(0, lambda: self._on_routes_found(routes, origin, dest))
