@@ -10,6 +10,13 @@ import json
 import requests
 
 
+boroondara_bounds = {
+    'min_lat': -37.95,
+    'max_lat': -37.75,
+    'min_lon': 145.00,
+    'max_lon': 145.15,
+}
+
 # colours for each route - the selected route uses its colour, others are drawn dimmed grey
 route_colours = [
     '#e05252', '#5299e0', '#52e08a', '#e0b452',
@@ -322,7 +329,23 @@ class PathfinderApp:
 
         origin = int(Loc_Start.split(" - ")[0])
         destination = int(Loc_End.split(" - ")[0])
+
+        if origin == destination:
+            self.show_error("Origin and destination cannot be the same node.")
+            return
+
         departure_time = datetime(2006, 11, selected_day, selected_hour, selected_min, 0)
+
+        #check that the coordinates are valid (ie. helping with 4266 - without fixing it)
+        lat1, lon1 = self.node_coordinates[origin]
+        lat2, lon2 = self.node_coordinates[destination]
+
+        if not self.is_valid_coordinate(lat1, lon1):
+            self.show_error(f'Node {origin} has invalid coordinates and falls outside the Boroondara area.')
+            return
+        if not self.is_valid_coordinate(lat2, lon2):
+            self.show_error(f'Node {destination} has invalid coordinates and falls outside the Boroondara area.')
+            return
 
         self.find_btn.config(state='disabled')
         self.status_label.config(text='Searching...')
@@ -474,6 +497,11 @@ class PathfinderApp:
 
         lat1, lon1 = self.node_coordinates[first]
         lat2, lon2 = self.node_coordinates[second]
+
+        # stop the connection being saved in coordinates.json
+        if not self.is_valid_coordinate(lat1, lon1) or not self.is_valid_coordinate(lat2, lon2):
+            self.status_label.config(text='Connection rejected — one or more nodes fall outside the Boroondara area.')
+            return
         distance_km, route_points = self.get_road_route(lat1, lon1, lat2, lon2)
 
         self.connections.setdefault(first, []).append((second, distance_km, route_points))
@@ -497,6 +525,10 @@ class PathfinderApp:
 
     # ------------------------------------------------------------------ #
     #____________________Error handling __________________________#
+
+    def is_valid_coordinate(self, lat, lon):
+        return (boroondara_bounds['min_lat'] <= lat <= boroondara_bounds['max_lat'] and
+                boroondara_bounds['min_lon'] <= lon <= boroondara_bounds['max_lon'])
 
     def _on_error(self, msg):
         # called back on the main thread if find_routes raises an exception
