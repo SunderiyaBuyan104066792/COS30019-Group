@@ -67,7 +67,6 @@ class PathfinderApp:
         self.day_var = tk.StringVar(value='1')
         self.hour_var = tk.StringVar(value='8')
         self.min_var = tk.StringVar(value='0')
-        self.k_var = tk.StringVar(value='3')
 
         # we use trace to track variables
         # https://www.geeksforgeeks.org/python/tracing-tkinter-variables-in-python/
@@ -146,8 +145,7 @@ class PathfinderApp:
         self._section_label(sidebar, 'Select Minute (0-59)')
         ttk.Spinbox(sidebar, from_=0, to=59, textvariable=self.min_var, width=27).pack(padx=12, pady=2)
 
-        self._section_label(sidebar, 'Select amount of paths')
-        ttk.Spinbox(sidebar, from_=1, to=10, textvariable=self.k_var, width=27).pack(padx=12, pady=2)
+
 
         # store as instance variable so submit() can disable it while a search is running
         self.find_btn = tk.Button(sidebar, text='Find Path', width=22, fg='#228B22', command=self.submit)
@@ -322,7 +320,6 @@ class PathfinderApp:
             selected_day = int(self.day_var.get())
             selected_hour = int(self.hour_var.get())
             selected_min = int(self.min_var.get())
-            selected_no_path = int(self.k_var.get())
         except ValueError:
             self.show_error("Invalid time or path count value")
             return
@@ -356,7 +353,7 @@ class PathfinderApp:
         # tkinter is not thread-safe so we cannot call UI methods directly from the thread
         def run():
             try:
-                routes = find_routes(origin, destination, departure_time, selected_model, selected_algo, selected_no_path)
+                routes = find_routes(origin, destination, departure_time, selected_model, selected_algo, 5)
                 self.root.after(0, lambda: self._on_routes_found(routes))
             except Exception as e:
                 self.root.after(0, lambda: self._on_error(str(e)))
