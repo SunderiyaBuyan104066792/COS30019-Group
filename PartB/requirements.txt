@@ -8,4 +8,5 @@ tkintermapview==1.29
 openpyxl
 python-calamine
 requests
+threading
 
